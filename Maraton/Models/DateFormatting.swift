@@ -33,6 +33,22 @@ extension Date {
         formatter.dateFormat = "EEEE d 'de' MMMM 'de' yyyy"
         return formatter.string(from: self).capitalizedFirst
     }
+
+    /// Ej. "Sábado 31 de mayo" (sin año, para el encabezado de Hoy).
+    var weekdayDayMonth: String {
+        let formatter = DateFormatter()
+        formatter.locale = Date.esAR
+        formatter.dateFormat = "EEEE d 'de' MMMM"
+        return formatter.string(from: self).capitalizedFirst
+    }
+
+    /// Ej. "jueves" (día de la semana, en minúscula para usar dentro de una frase).
+    var weekdayName: String {
+        let formatter = DateFormatter()
+        formatter.locale = Date.esAR
+        formatter.dateFormat = "EEEE"
+        return formatter.string(from: self)
+    }
 }
 
 extension String {
