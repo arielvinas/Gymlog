@@ -11,16 +11,16 @@ import SwiftData
 @Model
 final class SupplementReminder {
     /// Suplemento al que aplica (uno por tipo).
-    var kind: SupplementKind
+    var kind: SupplementKind = SupplementKind.creatina
 
     /// Si el recordatorio está activo.
-    var enabled: Bool
+    var enabled: Bool = false
 
     /// Hora del recordatorio (0-23).
-    var hour: Int
+    var hour: Int = 9
 
     /// Minuto del recordatorio (0-59).
-    var minute: Int
+    var minute: Int = 0
 
     init(kind: SupplementKind, enabled: Bool = false, hour: Int, minute: Int = 0) {
         self.kind = kind

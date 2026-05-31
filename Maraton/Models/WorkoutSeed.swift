@@ -165,25 +165,46 @@ enum WorkoutSeed {
 
     private static let versionKey = "seededPlanVersion"
 
-    /// Inserta el plan en el contexto sólo si todavía no hay datos.
+    /// Versión de plan ya sembrada. Con iCloud activo se guarda también en el
+    /// Key-Value Store (que sincroniza) para no re-sembrar ni duplicar al
+    /// reinstalar o estrenar un dispositivo nuevo; si no, sólo local.
+    private static var storedVersion: Int {
+        let local = UserDefaults.standard.integer(forKey: versionKey)
+        guard MaratonApp.iCloudSyncEnabled else { return local }
+        let cloud = Int(NSUbiquitousKeyValueStore.default.longLong(forKey: versionKey))
+        return max(cloud, local)
+    }
+
+    private static func markSeeded(_ version: Int) {
+        UserDefaults.standard.set(version, forKey: versionKey)
+        if MaratonApp.iCloudSyncEnabled {
+            NSUbiquitousKeyValueStore.default.set(Int64(version), forKey: versionKey)
+            NSUbiquitousKeyValueStore.default.synchronize()
+        }
+    }
+
+    /// Inserta el plan en el primer arranque, sólo si no se sembró antes y no
+    /// hay datos locales todavía.
     static func seedIfNeeded(context: ModelContext) {
-        let descriptor = FetchDescriptor<WorkoutDay>()
-        let count = (try? context.fetchCount(descriptor)) ?? 0
+        guard storedVersion == 0 else { return }
+
+        let count = (try? context.fetchCount(FetchDescriptor<WorkoutDay>())) ?? 0
         guard count == 0 else { return }
 
         for day in allWorkoutDays() {
             context.insert(day)
         }
         try? context.save()
-        UserDefaults.standard.set(planVersion, forKey: versionKey)
+        markSeeded(planVersion)
     }
 
-    /// Aplica las novedades del plan una sola vez por versión: inserta los días
-    /// del plan canónico que falten (por fecha) sin tocar los existentes.
-    /// Al versionar, los días que el usuario borre no se vuelven a insertar.
+    /// Aplica las novedades del plan: inserta los días del plan canónico que
+    /// falten (por fecha) sin tocar los existentes, una sola vez por versión.
+    /// Los días que el usuario borre no se vuelven a insertar.
     static func applyPlanUpdates(context: ModelContext) {
-        let stored = UserDefaults.standard.integer(forKey: versionKey)
+        let stored = storedVersion
         guard stored < planVersion else { return }
+        guard stored >= 1 else { return } // stored == 0 lo maneja seedIfNeeded
 
         if let existentes = try? context.fetch(FetchDescriptor<WorkoutDay>()) {
             let cal = PlanConstants.calendar
@@ -197,6 +218,6 @@ enum WorkoutSeed {
             if inserto { try? context.save() }
         }
 
-        UserDefaults.standard.set(planVersion, forKey: versionKey)
+        markSeeded(planVersion)
     }
 }

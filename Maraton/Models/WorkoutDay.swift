@@ -11,31 +11,32 @@ import SwiftData
 @Model
 final class WorkoutDay {
     /// Fecha del entrenamiento (única dentro del plan).
-    @Attribute(.unique) var date: Date
+    /// Nota: al activar CloudKit hay que quitar `.unique` (no lo admite).
+    @Attribute(.unique) var date: Date = Date()
 
     /// Título corto (ej. "Fondo largo 12 km").
-    var title: String
+    var title: String = ""
 
     /// Detalle breve que acompaña al título (ej. "Z2 conversacional").
-    var detail: String
+    var detail: String = ""
 
     /// Descripción larga con la explicación del entrenamiento.
-    var longDescription: String
+    var longDescription: String = ""
 
     /// Tipo de entrenamiento.
-    var type: WorkoutType
+    var type: WorkoutType = WorkoutType.descanso
 
     /// Título de la semana a la que pertenece (ej. "Semana 1", "Arranque").
-    var weekTitle: String
+    var weekTitle: String = ""
 
     /// Etiqueta opcional de la semana (ej. "Pico de volumen", "Taper").
     var weekTag: String?
 
     /// Orden de la semana para ordenar las secciones de la lista.
-    var weekOrder: Int
+    var weekOrder: Int = 0
 
     /// Indica si el día fue completado.
-    var isCompleted: Bool
+    var isCompleted: Bool = false
 
     /// Ejercicios de gimnasio (solo se usan en días de fuerza).
     @Relationship(deleteRule: .cascade, inverse: \Exercise.day)

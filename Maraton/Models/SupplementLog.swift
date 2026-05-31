@@ -12,10 +12,10 @@ import SwiftData
 @Model
 final class SupplementLog {
     /// Día de la toma (normalizado a las 00:00).
-    var date: Date
+    var date: Date = Date()
 
     /// Suplemento tomado.
-    var kind: SupplementKind
+    var kind: SupplementKind = SupplementKind.creatina
 
     init(date: Date, kind: SupplementKind) {
         self.date = date

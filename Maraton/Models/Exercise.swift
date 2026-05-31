@@ -11,14 +11,14 @@ import SwiftData
 @Model
 final class Exercise {
     /// Nombre del ejercicio (ej. "Press banca").
-    var name: String
+    var name: String = ""
 
     /// Orden dentro de la sesión del día.
-    var order: Int
+    var order: Int = 0
 
     /// Fecha del día al que pertenece (copiada de `day.date` para
     /// facilitar la búsqueda del histórico "última vez").
-    var dayDate: Date
+    var dayDate: Date = Date()
 
     /// Notas opcionales del ejercicio.
     var notes: String?

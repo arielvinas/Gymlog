@@ -11,7 +11,7 @@ import SwiftData
 @Model
 final class ExerciseSet {
     /// Número de serie dentro del ejercicio (1, 2, 3...).
-    var order: Int
+    var order: Int = 0
 
     /// Peso utilizado en kilogramos.
     var weight: Double?
@@ -20,7 +20,7 @@ final class ExerciseSet {
     var reps: Int?
 
     /// Indica si la serie fue completada.
-    var isDone: Bool
+    var isDone: Bool = false
 
     /// Ejercicio al que pertenece.
     var exercise: Exercise?

@@ -13,18 +13,43 @@ struct MaratonApp: App {
     let container: ModelContainer
 
     init() {
-        do {
-            container = try ModelContainer(
-                for: WorkoutDay.self, Exercise.self, ExerciseSet.self, DailyCheckIn.self,
-                SupplementLog.self, SupplementReminder.self
-            )
-        } catch {
-            fatalError("No se pudo crear el ModelContainer: \(error)")
-        }
+        container = MaratonApp.makeContainer()
+
         // Pre-carga el plan en el primer arranque y aplica las novedades del
         // plan (una vez por versión), respetando los días editados o borrados.
+        // El flag de sembrado vive en iCloud para no duplicar datos al
+        // reinstalar o estrenar un dispositivo nuevo.
         WorkoutSeed.seedIfNeeded(context: container.mainContext)
         WorkoutSeed.applyPlanUpdates(context: container.mainContext)
+    }
+
+    /// Activar cuando haya Apple Developer Program (de pago) + las capabilities
+    /// de iCloud/CloudKit/Push reactivadas. Los equipos personales (cuenta
+    /// gratuita) no admiten CloudKit, así que por ahora el almacenamiento es local.
+    static let iCloudSyncEnabled = false
+
+    /// Crea el contenedor. Con `iCloudSyncEnabled` usa CloudKit (con respaldo
+    /// local si no está disponible); si no, almacenamiento local — offline-first.
+    private static func makeContainer() -> ModelContainer {
+        let schema = Schema([
+            WorkoutDay.self, Exercise.self, ExerciseSet.self, DailyCheckIn.self,
+            SupplementLog.self, SupplementReminder.self,
+        ])
+
+        if iCloudSyncEnabled {
+            let cloudConfig = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
+            if let container = try? ModelContainer(for: schema, configurations: cloudConfig) {
+                return container
+            }
+        }
+
+        // Almacenamiento local (la app funciona igual sin iCloud).
+        let localConfig = ModelConfiguration(schema: schema, cloudKitDatabase: .none)
+        if let container = try? ModelContainer(for: schema, configurations: localConfig) {
+            return container
+        }
+
+        fatalError("No se pudo crear el ModelContainer")
     }
 
     var body: some Scene {
