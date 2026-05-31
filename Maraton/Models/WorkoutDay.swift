@@ -48,6 +48,12 @@ final class WorkoutDay {
     var perceivedEffort: Int?   // 1-10
     var notes: String?
 
+    /// Frecuencia cardíaca promedio (bpm), importada de Apple Salud.
+    var avgHeartRate: Double?
+
+    /// Calorías activas quemadas (kcal), importadas de Apple Salud.
+    var activeCalories: Double?
+
     init(
         date: Date,
         title: String,
@@ -61,7 +67,9 @@ final class WorkoutDay {
         actualKm: Double? = nil,
         durationMinutes: Int? = nil,
         perceivedEffort: Int? = nil,
-        notes: String? = nil
+        notes: String? = nil,
+        avgHeartRate: Double? = nil,
+        activeCalories: Double? = nil
     ) {
         self.date = date
         self.title = title
@@ -76,6 +84,14 @@ final class WorkoutDay {
         self.durationMinutes = durationMinutes
         self.perceivedEffort = perceivedEffort
         self.notes = notes
+        self.avgHeartRate = avgHeartRate
+        self.activeCalories = activeCalories
+    }
+
+    /// Ritmo promedio en segundos por kilómetro, si hay km y duración.
+    var paceSecondsPerKm: Double? {
+        guard let km = actualKm, km > 0, let minutes = durationMinutes else { return nil }
+        return (Double(minutes) * 60.0) / km
     }
 
     /// Ejercicios ordenados por su posición en la sesión.

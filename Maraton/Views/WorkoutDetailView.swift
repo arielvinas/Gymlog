@@ -129,6 +129,15 @@ struct WorkoutDetailView: View {
                 if let minutes = day.durationMinutes {
                     summaryRow(label: "Duración", value: "\(minutes) min")
                 }
+                if let pace = day.paceSecondsPerKm {
+                    summaryRow(label: "Ritmo", value: pace.formattedPace)
+                }
+                if let hr = day.avgHeartRate {
+                    summaryRow(label: "Frec. cardíaca", value: "\(Int(hr)) bpm")
+                }
+                if let cal = day.activeCalories {
+                    summaryRow(label: "Calorías", value: "\(Int(cal)) kcal")
+                }
                 if let effort = day.perceivedEffort {
                     summaryRow(label: "Esfuerzo", value: "\(effort)/10")
                 }

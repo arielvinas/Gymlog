@@ -22,4 +22,13 @@ extension Double {
     var formattedKg: String {
         formattedKm
     }
+
+    /// Interpreta el valor como segundos por km y lo formatea como ritmo
+    /// (ej. 330 → "5'30\"/km").
+    var formattedPace: String {
+        let totalSeconds = Int(rounded())
+        let minutes = totalSeconds / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%d'%02d\"/km", minutes, seconds)
+    }
 }
