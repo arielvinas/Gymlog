@@ -20,6 +20,10 @@ struct WorkoutDetailView: View {
                 header
                 description
 
+                if day.type == .fuerza {
+                    gymLink
+                }
+
                 if day.isCompleted {
                     completedSummary
                 }
@@ -62,6 +66,37 @@ struct WorkoutDetailView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
+    }
+
+    private var gymLink: some View {
+        NavigationLink {
+            GymSessionView(day: day)
+        } label: {
+            HStack {
+                Image(systemName: "dumbbell.fill")
+                    .foregroundStyle(WorkoutType.fuerza.color)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Rutina de gimnasio")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text(day.exercises.isEmpty
+                         ? "Cargá tus ejercicios y series"
+                         : "\(day.exercises.count) ejercicio\(day.exercises.count == 1 ? "" : "s")")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(WorkoutType.fuerza.color.opacity(0.12))
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var description: some View {

@@ -37,6 +37,10 @@ final class WorkoutDay {
     /// Indica si el día fue completado.
     var isCompleted: Bool
 
+    /// Ejercicios de gimnasio (solo se usan en días de fuerza).
+    @Relationship(deleteRule: .cascade, inverse: \Exercise.day)
+    var exercises: [Exercise] = []
+
     // MARK: - Campos de registro (se completan al marcar como hecho)
 
     var actualKm: Double?
@@ -72,5 +76,10 @@ final class WorkoutDay {
         self.durationMinutes = durationMinutes
         self.perceivedEffort = perceivedEffort
         self.notes = notes
+    }
+
+    /// Ejercicios ordenados por su posición en la sesión.
+    var orderedExercises: [Exercise] {
+        exercises.sorted { $0.order < $1.order }
     }
 }

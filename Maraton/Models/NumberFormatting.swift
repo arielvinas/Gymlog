@@ -17,4 +17,9 @@ extension Double {
         formatter.maximumFractionDigits = 1
         return formatter.string(from: NSNumber(value: self)) ?? "\(self)"
     }
+
+    /// Formatea kilogramos con hasta un decimal y coma decimal (ej. "42,5").
+    var formattedKg: String {
+        formattedKm
+    }
 }
