@@ -25,10 +25,6 @@ struct ProgressDashboardView: View {
 
     // MARK: - Datos derivados (lógica delegada a helpers)
 
-    private var readiness: Readiness {
-        ReadinessCalculator.compute(days: days)
-    }
-
     private var weekStreak: Int {
         StreakCalculator.currentWeekStreak(days: days)
     }
@@ -65,7 +61,6 @@ struct ProgressDashboardView: View {
                         )
                     }
 
-                    ReadinessCard(readiness: readiness)
                     ConsistencyCard(weekStreak: weekStreak)
                     SupplementsProgressCard()
                     ProjectionCard(projection: projection)

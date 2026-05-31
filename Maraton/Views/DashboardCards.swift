@@ -7,55 +7,6 @@
 
 import SwiftUI
 
-// MARK: - P2: Preparación para Córdoba
-
-struct ReadinessCard: View {
-    let readiness: Readiness
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                CardHeader(title: "Preparación para Córdoba", systemImage: "target", tint: .red)
-                Spacer()
-                Text("\(readiness.status.emoji) \(readiness.status.label)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(readiness.status.color)
-            }
-
-            ProgressView(value: readiness.adherence) {
-                HStack {
-                    Text("Adherencia al plan")
-                    Spacer()
-                    Text("\(Int((readiness.adherence * 100).rounded()))%")
-                        .fontWeight(.semibold)
-                        .monospacedDigit()
-                }
-                .font(.subheadline)
-            }
-            .tint(readiness.status.color)
-
-            HStack(spacing: 12) {
-                metric(value: "\(readiness.completedCount)/\(readiness.dueCount)", label: "Hechos")
-                metric(value: readiness.longestFondoKm.map { "\($0.formattedKm) km" } ?? "—", label: "Fondo máx.")
-                metric(value: "\(readiness.activeWeeks)", label: "Semanas activas")
-            }
-        }
-        .dashboardCard()
-    }
-
-    private func metric(value: String, label: String) -> some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.headline)
-                .monospacedDigit()
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
 // MARK: - P4: Consistencia
 
 struct ConsistencyCard: View {

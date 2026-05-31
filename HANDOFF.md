@@ -9,10 +9,9 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
 - Seguimiento de corridas con importación desde Apple Health (HealthKit).
 - Rutina de gimnasio (ejercicios/series/peso) + importación de métricas de
   sesiones de fuerza desde Health.
-- Dashboard en 3 tabs: **Hoy** (qué hago hoy + check-in + suplementos),
-  **Plan** (editable: crear/editar/borrar días), **Progreso** (preparación,
-  consistencia, proyección, evolución de fuerza, suplementos).
-- Check-in de recuperación diario (energía/dolor/motivación).
+- Dashboard en 3 tabs: **Hoy** (qué hago hoy + suplementos),
+  **Plan** (editable: crear/editar/borrar días), **Progreso** (consistencia,
+  proyección, evolución de fuerza, suplementos).
 - Suplementos (creatina, proteína): marcado diario, adherencia, rachas y
   recordatorios locales configurables.
 
@@ -23,8 +22,8 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
 
 ## Estructura del código
 - `Maraton/Models/` — modelos SwiftData (`WorkoutDay`, `Exercise`, `ExerciseSet`,
-  `DailyCheckIn`, `SupplementLog`, `SupplementReminder`) + helpers de cálculo
-  (`ReadinessCalculator`, `RaceProjection`, `StreakCalculator`, `StrengthProgress`,
+  `SupplementLog`, `SupplementReminder`) + helpers de cálculo
+  (`RaceProjection`, `StreakCalculator`, `StrengthProgress`,
   `SupplementTracker`, `ExerciseHistory`) + `HealthManager`, `NotificationManager`,
   `WorkoutSeed`, `WeekAssigner`, formateadores.
 - `Maraton/Views/` — `RootView` (adaptable), `TodayView`, `PlanView`,
@@ -87,7 +86,7 @@ La capa de datos ya quedó **preparada** (bajo riesgo, sin tocar datos actuales)
    `aps-environment` (`development`).
 2. `project.pbxproj` (Debug y Release): agregar
    `INFOPLIST_KEY_UIBackgroundModes = "remote-notification";`.
-3. Quitar `@Attribute(.unique)` de `WorkoutDay.date` y `DailyCheckIn.date`
+3. Quitar `@Attribute(.unique)` de `WorkoutDay.date`
    (CloudKit no admite constraints únicos; la unicidad ya se valida por código).
 4. `MaratonApp.iCloudSyncEnabled = true`.
 5. Compilar para device con `-allowProvisioningUpdates` (la firma automática

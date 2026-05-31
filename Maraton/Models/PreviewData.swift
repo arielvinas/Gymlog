@@ -13,7 +13,7 @@ enum PreviewData {
     @MainActor static let container: ModelContainer = {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(
-            for: WorkoutDay.self, Exercise.self, ExerciseSet.self, DailyCheckIn.self,
+            for: WorkoutDay.self, Exercise.self, ExerciseSet.self,
             SupplementLog.self, SupplementReminder.self,
             configurations: config
         )

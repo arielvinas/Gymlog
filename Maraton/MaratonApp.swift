@@ -33,7 +33,7 @@ struct MaratonApp: App {
     /// local si no está disponible); si no, almacenamiento local — offline-first.
     private static func makeContainer() -> ModelContainer {
         let schema = Schema([
-            WorkoutDay.self, Exercise.self, ExerciseSet.self, DailyCheckIn.self,
+            WorkoutDay.self, Exercise.self, ExerciseSet.self,
             SupplementLog.self, SupplementReminder.self,
         ])
 

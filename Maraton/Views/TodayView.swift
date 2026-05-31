@@ -10,15 +10,9 @@ import SwiftData
 
 struct TodayView: View {
     @Query(sort: \WorkoutDay.date) private var days: [WorkoutDay]
-    @Query private var checkIns: [DailyCheckIn]
 
     private var todayWorkout: WorkoutDay? {
         DailyPlanInfo.workout(in: days)
-    }
-
-    private var todayCheckIn: DailyCheckIn? {
-        let cal = PlanConstants.calendar
-        return checkIns.first { cal.isDateInToday($0.date) }
     }
 
     var body: some View {
@@ -26,7 +20,6 @@ struct TodayView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     TodayHeroCard(day: todayWorkout)
-                    CheckInCard(existing: todayCheckIn)
                     SupplementsTodayCard()
                 }
                 .padding()
