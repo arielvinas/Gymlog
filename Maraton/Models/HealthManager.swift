@@ -59,16 +59,11 @@ final class HealthManager {
     /// Si hay varias, toma la de mayor distancia.
     func importRun(for date: Date) async throws -> ImportedWorkout {
         try await requestAuthorization()
-
-        let cal = PlanConstants.calendar
-        let start = cal.startOfDay(for: date)
-        guard let end = cal.date(byAdding: .day, value: 1, to: start) else {
+        let workouts = try await workouts(on: date, activityTypes: [.running])
+        // La de mayor distancia recorrida.
+        guard let workout = workouts.max(by: { (distanceKm(of: $0) ?? 0) < (distanceKm(of: $1) ?? 0) }) else {
             throw HealthError.noWorkoutFound
         }
-
-        let workout = try await mostRelevantRun(start: start, end: end)
-        guard let workout else { throw HealthError.noWorkoutFound }
-
         return ImportedWorkout(
             km: distanceKm(of: workout),
             minutes: Int((workout.duration / 60.0).rounded()),
@@ -77,15 +72,41 @@ final class HealthManager {
         )
     }
 
+    /// Busca la sesión de fuerza del día y devuelve sus métricas globales
+    /// (duración, FC promedio, calorías). HealthKit no expone series ni peso.
+    /// Si hay varias, toma la de mayor duración.
+    func importStrength(for date: Date) async throws -> ImportedWorkout {
+        try await requestAuthorization()
+        let workouts = try await workouts(
+            on: date,
+            activityTypes: [.traditionalStrengthTraining, .functionalStrengthTraining]
+        )
+        // La de mayor duración.
+        guard let workout = workouts.max(by: { $0.duration < $1.duration }) else {
+            throw HealthError.noWorkoutFound
+        }
+        return ImportedWorkout(
+            km: nil,
+            minutes: Int((workout.duration / 60.0).rounded()),
+            avgHeartRate: try await averageHeartRate(for: workout),
+            activeCalories: activeCalories(of: workout)
+        )
+    }
+
     // MARK: - Consultas
 
-    /// Devuelve la corrida con mayor distancia dentro del rango de fechas.
-    private func mostRelevantRun(start: Date, end: Date) async throws -> HKWorkout? {
-        let datePredicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
-        let runPredicate = HKQuery.predicateForWorkouts(with: .running)
-        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [datePredicate, runPredicate])
+    /// Devuelve los workouts del día que coincidan con alguno de los tipos dados.
+    private func workouts(on date: Date, activityTypes: [HKWorkoutActivityType]) async throws -> [HKWorkout] {
+        let cal = PlanConstants.calendar
+        let start = cal.startOfDay(for: date)
+        guard let end = cal.date(byAdding: .day, value: 1, to: start) else { return [] }
 
-        let workouts: [HKWorkout] = try await withCheckedThrowingContinuation { continuation in
+        let datePredicate = HKQuery.predicateForSamples(withStart: start, end: end, options: .strictStartDate)
+        let typePredicates = activityTypes.map { HKQuery.predicateForWorkouts(with: $0) }
+        let typePredicate = NSCompoundPredicate(orPredicateWithSubpredicates: typePredicates)
+        let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [datePredicate, typePredicate])
+
+        return try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
                 sampleType: HKObjectType.workoutType(),
                 predicate: predicate,
@@ -100,9 +121,6 @@ final class HealthManager {
             }
             store.execute(query)
         }
-
-        // La de mayor distancia recorrida.
-        return workouts.max { (distanceKm(of: $0) ?? 0) < (distanceKm(of: $1) ?? 0) }
     }
 
     /// Distancia del workout en kilómetros.

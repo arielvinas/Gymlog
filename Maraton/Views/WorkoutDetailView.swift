@@ -13,6 +13,8 @@ struct WorkoutDetailView: View {
     @Environment(\.modelContext) private var context
 
     @State private var showingForm = false
+    @State private var isImporting = false
+    @State private var importError: String?
 
     var body: some View {
         ScrollView {
@@ -22,6 +24,7 @@ struct WorkoutDetailView: View {
 
                 if day.type == .fuerza {
                     gymLink
+                    strengthHealthButton
                 }
 
                 if day.isCompleted {
@@ -36,6 +39,11 @@ struct WorkoutDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingForm) {
             CompletionFormView(day: day)
+        }
+        .alert("Apple Salud", isPresented: .constant(importError != nil)) {
+            Button("Entendido") { importError = nil }
+        } message: {
+            Text(importError ?? "")
         }
     }
 
@@ -99,6 +107,36 @@ struct WorkoutDetailView: View {
         .buttonStyle(.plain)
     }
 
+    private var strengthHealthButton: some View {
+        Button {
+            Task { await importarFuerza() }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "heart.fill")
+                    .foregroundStyle(.pink)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Importar de Apple Salud")
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Text("Duración, calorías y pulso de tu Apple Watch")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if isImporting {
+                    ProgressView()
+                }
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.pink.opacity(0.10))
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isImporting)
+    }
+
     private var description: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Cómo encararlo")
@@ -122,25 +160,23 @@ struct WorkoutDetailView: View {
                 .font(.headline)
                 .foregroundStyle(.green)
 
-            if day.type.isRun {
-                if let km = day.actualKm {
-                    summaryRow(label: "Distancia", value: "\(km.formattedKm) km")
-                }
-                if let minutes = day.durationMinutes {
-                    summaryRow(label: "Duración", value: "\(minutes) min")
-                }
-                if let pace = day.paceSecondsPerKm {
-                    summaryRow(label: "Ritmo", value: pace.formattedPace)
-                }
-                if let hr = day.avgHeartRate {
-                    summaryRow(label: "Frec. cardíaca", value: "\(Int(hr)) bpm")
-                }
-                if let cal = day.activeCalories {
-                    summaryRow(label: "Calorías", value: "\(Int(cal)) kcal")
-                }
-                if let effort = day.perceivedEffort {
-                    summaryRow(label: "Esfuerzo", value: "\(effort)/10")
-                }
+            if let km = day.actualKm {
+                summaryRow(label: "Distancia", value: "\(km.formattedKm) km")
+            }
+            if let minutes = day.durationMinutes {
+                summaryRow(label: "Duración", value: "\(minutes) min")
+            }
+            if let pace = day.paceSecondsPerKm {
+                summaryRow(label: "Ritmo", value: pace.formattedPace)
+            }
+            if let hr = day.avgHeartRate {
+                summaryRow(label: "Frec. cardíaca", value: "\(Int(hr)) bpm")
+            }
+            if let cal = day.activeCalories {
+                summaryRow(label: "Calorías", value: "\(Int(cal)) kcal")
+            }
+            if let effort = day.perceivedEffort {
+                summaryRow(label: "Esfuerzo", value: "\(effort)/10")
             }
             if let notes = day.notes, !notes.isEmpty {
                 summaryRow(label: "Notas", value: notes)
@@ -205,7 +241,24 @@ struct WorkoutDetailView: View {
         day.durationMinutes = nil
         day.perceivedEffort = nil
         day.notes = nil
+        day.avgHeartRate = nil
+        day.activeCalories = nil
         try? context.save()
+    }
+
+    private func importarFuerza() async {
+        isImporting = true
+        defer { isImporting = false }
+        do {
+            let data = try await HealthManager.shared.importStrength(for: day.date)
+            day.durationMinutes = data.minutes
+            day.avgHeartRate = data.avgHeartRate
+            day.activeCalories = data.activeCalories
+            day.isCompleted = true
+            try? context.save()
+        } catch {
+            importError = error.localizedDescription
+        }
     }
 }
 
