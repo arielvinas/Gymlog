@@ -16,18 +16,61 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
 - Suplementos (creatina, proteína): marcado diario, adherencia, rachas y
   recordatorios locales configurables.
 
+- **Versión Mac (Mac Catalyst):** mismo target. Barra lateral
+  (`NavigationSplitView`), ventana redimensionable, menú "Ir a" con atajos
+  ⌘1/⌘2/⌘3. Apple Salud se oculta en Mac (no existe). UI adaptable en
+  `RootView.swift` (`#if targetEnvironment(macCatalyst)`).
+
+## Estructura del código
+- `Maraton/Models/` — modelos SwiftData (`WorkoutDay`, `Exercise`, `ExerciseSet`,
+  `DailyCheckIn`, `SupplementLog`, `SupplementReminder`) + helpers de cálculo
+  (`ReadinessCalculator`, `RaceProjection`, `StreakCalculator`, `StrengthProgress`,
+  `SupplementTracker`, `ExerciseHistory`) + `HealthManager`, `NotificationManager`,
+  `WorkoutSeed`, `WeekAssigner`, formateadores.
+- `Maraton/Views/` — `RootView` (adaptable), `TodayView`, `PlanView`,
+  `WorkoutDetailView`, `WorkoutEditView`, `GymSessionView`, `CompletionFormView`,
+  `ProgressDashboardView`, tarjetas del dashboard, `SupplementSettingsView`.
+- Proyecto usa **PBXFileSystemSynchronizedRootGroup**: los archivos nuevos en
+  `Maraton/` se agregan solos al target (no hace falta editar el `.pbxproj`).
+
 ## Build / deploy (CLI)
 - **iPhone físico:** "iPhone de Ariel", iPhone 15 Pro, UDID
-  `<UDID-IPHONE>`. Build con
-  `-destination 'platform=iOS,name=iPhone de Ariel' -allowProvisioningUpdates`
-  → `devicectl device install/launch`. Requiere teléfono desbloqueado y perfil
-  de desarrollador confiado.
+  `<UDID-IPHONE>`.
+  ```sh
+  xcodebuild -project Maraton.xcodeproj -scheme Maraton \
+    -destination 'platform=iOS,name=iPhone de Ariel' -configuration Debug \
+    -derivedDataPath /tmp/maraton-device -allowProvisioningUpdates build
+  xcrun devicectl device install app --device <UDID-IPHONE> \
+    /tmp/maraton-device/Build/Products/Debug-iphoneos/Maraton.app
+  xcrun devicectl device process launch --device <UDID-IPHONE> ariel.Maraton
+  ```
+  Requiere el teléfono **desbloqueado** y el perfil de desarrollador confiado
+  (Ajustes → General → VPN y gestión de dispositivos).
 - **Simulador:** iPhone 15 Pro (creado a mano; el Xcode trae sólo serie 17).
+- **Mac (Catalyst), prueba local sin cuenta** (la sesión de Xcode estaba
+  rechazando el login; por eso firma ad-hoc "Sign to Run Locally"):
+  ```sh
+  xcodebuild -project Maraton.xcodeproj -scheme Maraton \
+    -destination 'platform=macOS,variant=Mac Catalyst' -configuration Debug \
+    -derivedDataPath /tmp/maraton-catalyst \
+    CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER="" DEVELOPMENT_TEAM="" build
+  open /tmp/maraton-catalyst/Build/Products/Debug-maccatalyst/Maraton.app
+  ```
+  Para correrla desde Xcode con la cuenta: re-loguear en Xcode
+  (Settings → Accounts) y registrar la Mac.
+
+## Pendientes / próximos pasos posibles
+- Activar iCloud (ver sección abajo) — requiere cuenta de pago.
+- Dejar la `.app` de Mac en una ubicación fija (hoy queda en `/tmp`).
+- Posibles mejoras pedidas pero no hechas: ritmo objetivo en la tarjeta "Hoy",
+  más suplementos, dosis/cantidad por suplemento.
 
 ## ⚠️ Sincronización iCloud (PENDIENTE — requiere cuenta de pago)
 CloudKit + Push **no están permitidos en cuentas de desarrollador gratuitas**
 (equipos personales). Para activar la sync se necesita el **Apple Developer
-Program de pago (US$99/año)**.
+Program de pago (US$99/año)**. Hasta entonces, iPhone y Mac funcionan cada uno
+con su **base local** (no comparten datos todavía); al activar iCloud, ambos
+sincronizan automáticamente sin más cambios.
 
 La capa de datos ya quedó **preparada** (bajo riesgo, sin tocar datos actuales):
 - Todos los `@Model` tienen valores por defecto (requisito de CloudKit).
