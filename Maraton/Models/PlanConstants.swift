@@ -21,6 +21,15 @@ enum PlanConstants {
         cal.firstWeekday = 2 // lunes
         return cal
     }
+
+    /// Días restantes hasta la carrera (nunca negativo).
+    static func daysUntilRace(from date: Date = Date()) -> Int {
+        let cal = calendar
+        let today = cal.startOfDay(for: date)
+        let race = cal.startOfDay(for: raceDate)
+        let diff = cal.dateComponents([.day], from: today, to: race).day ?? 0
+        return max(diff, 0)
+    }
 }
 
 extension DateComponents {

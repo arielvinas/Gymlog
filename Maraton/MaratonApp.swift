@@ -14,7 +14,7 @@ struct MaratonApp: App {
 
     init() {
         do {
-            container = try ModelContainer(for: WorkoutDay.self, Exercise.self, ExerciseSet.self)
+            container = try ModelContainer(for: WorkoutDay.self, Exercise.self, ExerciseSet.self, DailyCheckIn.self)
         } catch {
             fatalError("No se pudo crear el ModelContainer: \(error)")
         }

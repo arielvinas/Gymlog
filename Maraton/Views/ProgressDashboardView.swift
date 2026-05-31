@@ -10,15 +10,9 @@ import SwiftData
 
 struct ProgressDashboardView: View {
     @Query private var days: [WorkoutDay]
+    @Query private var exercises: [Exercise]
 
-    /// Días restantes hasta la carrera (mínimo 0).
-    private var daysToRace: Int {
-        let cal = PlanConstants.calendar
-        let today = cal.startOfDay(for: Date())
-        let race = cal.startOfDay(for: PlanConstants.raceDate)
-        let diff = cal.dateComponents([.day], from: today, to: race).day ?? 0
-        return max(diff, 0)
-    }
+    private var daysToRace: Int { PlanConstants.daysUntilRace() }
 
     /// Suma de kilómetros reales registrados en días completados.
     private var totalKm: Double {
@@ -27,6 +21,25 @@ struct ProgressDashboardView: View {
 
     private var completedCount: Int {
         days.filter { $0.isCompleted }.count
+    }
+
+    // MARK: - Datos derivados (lógica delegada a helpers)
+
+    private var readiness: Readiness {
+        ReadinessCalculator.compute(days: days)
+    }
+
+    private var weekStreak: Int {
+        StreakCalculator.currentWeekStreak(days: days)
+    }
+
+    private var projection: RaceProjection? {
+        let runs = RaceProjectionBuilder.samples(from: days)
+        return AveragePaceProjection().project(from: runs, today: Date())
+    }
+
+    private var improvements: [ExerciseImprovement] {
+        StrengthProgress.recentImprovements(exercises: exercises)
     }
 
     var body: some View {
@@ -51,6 +64,11 @@ struct ProgressDashboardView: View {
                             color: .green
                         )
                     }
+
+                    ReadinessCard(readiness: readiness)
+                    ConsistencyCard(weekStreak: weekStreak)
+                    ProjectionCard(projection: projection)
+                    StrengthEvolutionCard(improvements: improvements)
                 }
                 .padding()
             }

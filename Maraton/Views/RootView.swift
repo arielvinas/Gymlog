@@ -11,6 +11,11 @@ import SwiftData
 struct RootView: View {
     var body: some View {
         TabView {
+            TodayView()
+                .tabItem {
+                    Label("Hoy", systemImage: "sun.max.fill")
+                }
+
             PlanView()
                 .tabItem {
                     Label("Plan", systemImage: "calendar")
