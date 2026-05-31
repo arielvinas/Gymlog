@@ -27,7 +27,9 @@ struct WorkoutDetailView: View {
 
                 if day.type == .fuerza {
                     gymLink
-                    strengthHealthButton
+                    if HealthManager.isHealthAvailable {
+                        strengthHealthButton
+                    }
                 }
 
                 if day.isCompleted {

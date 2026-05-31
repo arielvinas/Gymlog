@@ -11,6 +11,7 @@ import SwiftData
 @main
 struct MaratonApp: App {
     let container: ModelContainer
+    @State private var navigator = Navigator()
 
     init() {
         container = MaratonApp.makeContainer()
@@ -55,7 +56,12 @@ struct MaratonApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .environment(navigator)
         }
         .modelContainer(container)
+        .defaultSize(width: 1100, height: 760)
+        .commands {
+            SectionCommands(navigator: navigator)
+        }
     }
 }

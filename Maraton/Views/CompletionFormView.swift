@@ -27,22 +27,24 @@ struct CompletionFormView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Button {
-                        Task { await importarDeSalud() }
-                    } label: {
-                        HStack {
-                            Label("Importar de Apple Salud", systemImage: "heart.fill")
-                                .foregroundStyle(.pink)
-                            Spacer()
-                            if isImporting {
-                                ProgressView()
+                if HealthManager.isHealthAvailable {
+                    Section {
+                        Button {
+                            Task { await importarDeSalud() }
+                        } label: {
+                            HStack {
+                                Label("Importar de Apple Salud", systemImage: "heart.fill")
+                                    .foregroundStyle(.pink)
+                                Spacer()
+                                if isImporting {
+                                    ProgressView()
+                                }
                             }
                         }
+                        .disabled(isImporting)
+                    } footer: {
+                        Text("Trae distancia, duración, frecuencia cardíaca y calorías del entrenamiento de tu Apple Watch.")
                     }
-                    .disabled(isImporting)
-                } footer: {
-                    Text("Trae distancia, duración, frecuencia cardíaca y calorías del entrenamiento de tu Apple Watch.")
                 }
 
                 Section("Registro de la corrida") {

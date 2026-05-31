@@ -2,31 +2,52 @@
 //  RootView.swift
 //  Maraton
 //
-//  Contenedor principal con las tres pestañas de la app.
+//  Contenedor principal: barra lateral en Mac, pestañas en iPhone.
 //
 
 import SwiftUI
 import SwiftData
+import Observation
+
+/// Secciones principales de la app.
+enum AppSection: String, CaseIterable, Identifiable {
+    case hoy, plan, progreso
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .hoy:      return "Hoy"
+        case .plan:     return "Plan"
+        case .progreso: return "Progreso"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .hoy:      return "sun.max.fill"
+        case .plan:     return "calendar"
+        case .progreso: return "chart.bar.fill"
+        }
+    }
+}
+
+/// Estado de navegación compartido (lo usan la UI y los atajos de teclado).
+@Observable
+final class Navigator {
+    var section: AppSection = .hoy
+}
 
 struct RootView: View {
     @Environment(\.modelContext) private var context
 
     var body: some View {
-        TabView {
-            TodayView()
-                .tabItem {
-                    Label("Hoy", systemImage: "sun.max.fill")
-                }
-
-            PlanView()
-                .tabItem {
-                    Label("Plan", systemImage: "calendar")
-                }
-
-            ProgressDashboardView()
-                .tabItem {
-                    Label("Progreso", systemImage: "chart.bar.fill")
-                }
+        Group {
+            #if targetEnvironment(macCatalyst)
+            SidebarRootView()
+            #else
+            TabRootView()
+            #endif
         }
         .task {
             // Reprograma los recordatorios activos (p. ej. tras reinstalar).
@@ -37,7 +58,75 @@ struct RootView: View {
     }
 }
 
+// MARK: - iPhone / iPad: pestañas
+
+private struct TabRootView: View {
+    @Environment(Navigator.self) private var navigator
+
+    var body: some View {
+        @Bindable var navigator = navigator
+        TabView(selection: $navigator.section) {
+            TodayView()
+                .tabItem { Label("Hoy", systemImage: "sun.max.fill") }
+                .tag(AppSection.hoy)
+            PlanView()
+                .tabItem { Label("Plan", systemImage: "calendar") }
+                .tag(AppSection.plan)
+            ProgressDashboardView()
+                .tabItem { Label("Progreso", systemImage: "chart.bar.fill") }
+                .tag(AppSection.progreso)
+        }
+    }
+}
+
+// MARK: - Mac: barra lateral
+
+private struct SidebarRootView: View {
+    @Environment(Navigator.self) private var navigator
+
+    var body: some View {
+        let selection = Binding<AppSection?>(
+            get: { navigator.section },
+            set: { if let value = $0 { navigator.section = value } }
+        )
+
+        NavigationSplitView {
+            List(selection: selection) {
+                ForEach(AppSection.allCases) { section in
+                    Label(section.title, systemImage: section.symbol)
+                        .tag(Optional(section))
+                }
+            }
+            .navigationTitle("Maratón")
+        } detail: {
+            switch navigator.section {
+            case .hoy:      TodayView()
+            case .plan:     PlanView()
+            case .progreso: ProgressDashboardView()
+            }
+        }
+    }
+}
+
+// MARK: - Menús y atajos de teclado (Mac)
+
+struct SectionCommands: Commands {
+    var navigator: Navigator
+
+    var body: some Commands {
+        CommandMenu("Ir a") {
+            Button("Hoy") { navigator.section = .hoy }
+                .keyboardShortcut("1", modifiers: .command)
+            Button("Plan") { navigator.section = .plan }
+                .keyboardShortcut("2", modifiers: .command)
+            Button("Progreso") { navigator.section = .progreso }
+                .keyboardShortcut("3", modifiers: .command)
+        }
+    }
+}
+
 #Preview {
     RootView()
+        .environment(Navigator())
         .modelContainer(PreviewData.container)
 }

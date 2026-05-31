@@ -6,7 +6,9 @@
 //
 
 import Foundation
+#if !targetEnvironment(macCatalyst)
 import HealthKit
+#endif
 
 /// Datos importados de un entrenamiento de Apple Salud.
 struct ImportedWorkout {
@@ -30,12 +32,37 @@ enum HealthError: LocalizedError {
     }
 }
 
+#if targetEnvironment(macCatalyst)
+
+// En Mac no existe Apple Salud: stub que mantiene la API sin romper nada.
+@MainActor
+final class HealthManager {
+    static let shared = HealthManager()
+    private init() {}
+
+    /// Apple Salud no está disponible en Mac.
+    static var isHealthAvailable: Bool { false }
+
+    func importRun(for date: Date) async throws -> ImportedWorkout {
+        throw HealthError.notAvailable
+    }
+
+    func importStrength(for date: Date) async throws -> ImportedWorkout {
+        throw HealthError.notAvailable
+    }
+}
+
+#else
+
 @MainActor
 final class HealthManager {
     static let shared = HealthManager()
     private let store = HKHealthStore()
 
     private init() {}
+
+    /// Indica si Apple Salud está disponible en este dispositivo.
+    static var isHealthAvailable: Bool { HKHealthStore.isHealthDataAvailable() }
 
     /// Tipos que necesitamos leer.
     private var readTypes: Set<HKObjectType> {
@@ -160,3 +187,5 @@ final class HealthManager {
         }
     }
 }
+
+#endif
