@@ -11,10 +11,13 @@ import SwiftData
 struct WorkoutDetailView: View {
     @Bindable var day: WorkoutDay
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
 
     @State private var showingForm = false
     @State private var isImporting = false
     @State private var importError: String?
+    @State private var showingEdit = false
+    @State private var showingDeleteConfirm = false
 
     var body: some View {
         ScrollView {
@@ -37,13 +40,44 @@ struct WorkoutDetailView: View {
         }
         .navigationTitle(day.type.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        showingEdit = true
+                    } label: {
+                        Label("Editar", systemImage: "pencil")
+                    }
+                    Button(role: .destructive) {
+                        showingDeleteConfirm = true
+                    } label: {
+                        Label("Eliminar día", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+        }
         .sheet(isPresented: $showingForm) {
             CompletionFormView(day: day)
+        }
+        .sheet(isPresented: $showingEdit) {
+            WorkoutEditView(editing: day)
         }
         .alert("Apple Salud", isPresented: .constant(importError != nil)) {
             Button("Entendido") { importError = nil }
         } message: {
             Text(importError ?? "")
+        }
+        .confirmationDialog(
+            "¿Eliminar este día del plan?",
+            isPresented: $showingDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Eliminar", role: .destructive) { eliminarDia() }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Se borrará junto con su rutina de gimnasio y registros. Esta acción no se puede deshacer.")
         }
     }
 
@@ -244,6 +278,12 @@ struct WorkoutDetailView: View {
         day.avgHeartRate = nil
         day.activeCalories = nil
         try? context.save()
+    }
+
+    private func eliminarDia() {
+        context.delete(day)
+        try? context.save()
+        dismiss()
     }
 
     private func importarFuerza() async {

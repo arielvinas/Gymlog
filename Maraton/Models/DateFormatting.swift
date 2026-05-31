@@ -18,6 +18,14 @@ extension Date {
         return formatter.string(from: self).capitalizedFirst
     }
 
+    /// Ej. "30 may".
+    var dayMonth: String {
+        let formatter = DateFormatter()
+        formatter.locale = Date.esAR
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: self)
+    }
+
     /// Ej. "Viernes 30 de mayo de 2026".
     var longDate: String {
         let formatter = DateFormatter()

@@ -10,6 +10,10 @@ import SwiftData
 
 struct PlanView: View {
     @Query(sort: \WorkoutDay.date) private var days: [WorkoutDay]
+    @Environment(\.modelContext) private var context
+
+    @State private var showingNew = false
+    @State private var editingDay: WorkoutDay?
 
     /// Días agrupados por semana, ordenados por la fecha de su primer día.
     private var weeks: [(title: String, tag: String?, days: [WorkoutDay])] {
@@ -34,6 +38,19 @@ struct PlanView: View {
                             } label: {
                                 WorkoutRow(day: day)
                             }
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    eliminar(day)
+                                } label: {
+                                    Label("Eliminar", systemImage: "trash")
+                                }
+                                Button {
+                                    editingDay = day
+                                } label: {
+                                    Label("Editar", systemImage: "pencil")
+                                }
+                                .tint(.blue)
+                            }
                         }
                     } header: {
                         WeekHeader(title: week.title, tag: week.tag)
@@ -41,7 +58,27 @@ struct PlanView: View {
                 }
             }
             .navigationTitle("Mi plan")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingNew = true
+                    } label: {
+                        Label("Agregar día", systemImage: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingNew) {
+                WorkoutEditView(editing: nil)
+            }
+            .sheet(item: $editingDay) { day in
+                WorkoutEditView(editing: day)
+            }
         }
+    }
+
+    private func eliminar(_ day: WorkoutDay) {
+        context.delete(day)
+        try? context.save()
     }
 }
 

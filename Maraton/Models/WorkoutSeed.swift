@@ -159,6 +159,12 @@ enum WorkoutSeed {
         return result
     }
 
+    /// Versión del plan canónico. Subir este número cuando se agreguen días
+    /// nuevos al plan que deban sincronizarse en instalaciones existentes.
+    static let planVersion = 2
+
+    private static let versionKey = "seededPlanVersion"
+
     /// Inserta el plan en el contexto sólo si todavía no hay datos.
     static func seedIfNeeded(context: ModelContext) {
         let descriptor = FetchDescriptor<WorkoutDay>()
@@ -169,21 +175,28 @@ enum WorkoutSeed {
             context.insert(day)
         }
         try? context.save()
+        UserDefaults.standard.set(planVersion, forKey: versionKey)
     }
 
-    /// Reconcilia el plan: inserta los días del plan canónico que todavía no
-    /// existan (comparando por fecha), sin modificar los días ya presentes.
-    /// Permite agregar días nuevos al plan sin perder el progreso registrado.
-    static func syncPlan(context: ModelContext) {
-        guard let existentes = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
-        let cal = PlanConstants.calendar
-        let fechasExistentes = Set(existentes.map { cal.startOfDay(for: $0.date) })
+    /// Aplica las novedades del plan una sola vez por versión: inserta los días
+    /// del plan canónico que falten (por fecha) sin tocar los existentes.
+    /// Al versionar, los días que el usuario borre no se vuelven a insertar.
+    static func applyPlanUpdates(context: ModelContext) {
+        let stored = UserDefaults.standard.integer(forKey: versionKey)
+        guard stored < planVersion else { return }
 
-        var inserto = false
-        for day in allWorkoutDays() where !fechasExistentes.contains(cal.startOfDay(for: day.date)) {
-            context.insert(day)
-            inserto = true
+        if let existentes = try? context.fetch(FetchDescriptor<WorkoutDay>()) {
+            let cal = PlanConstants.calendar
+            let fechasExistentes = Set(existentes.map { cal.startOfDay(for: $0.date) })
+
+            var inserto = false
+            for day in allWorkoutDays() where !fechasExistentes.contains(cal.startOfDay(for: day.date)) {
+                context.insert(day)
+                inserto = true
+            }
+            if inserto { try? context.save() }
         }
-        if inserto { try? context.save() }
+
+        UserDefaults.standard.set(planVersion, forKey: versionKey)
     }
 }
