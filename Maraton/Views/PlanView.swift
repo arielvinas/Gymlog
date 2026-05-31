@@ -1,0 +1,125 @@
+//
+//  PlanView.swift
+//  Maraton
+//
+//  Pantalla principal: el plan completo agrupado por semana.
+//
+
+import SwiftUI
+import SwiftData
+
+struct PlanView: View {
+    @Query(sort: \WorkoutDay.date) private var days: [WorkoutDay]
+
+    /// Días agrupados por semana, ordenados por `weekOrder`.
+    private var weeks: [(title: String, tag: String?, days: [WorkoutDay])] {
+        let grouped = Dictionary(grouping: days, by: { $0.weekOrder })
+        return grouped.keys.sorted().compactMap { order in
+            guard let weekDays = grouped[order], let first = weekDays.first else { return nil }
+            return (title: first.weekTitle, tag: first.weekTag, days: weekDays)
+        }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(weeks, id: \.title) { week in
+                    Section {
+                        ForEach(week.days) { day in
+                            NavigationLink {
+                                WorkoutDetailView(day: day)
+                            } label: {
+                                WorkoutRow(day: day)
+                            }
+                        }
+                    } header: {
+                        WeekHeader(title: week.title, tag: week.tag)
+                    }
+                }
+            }
+            .navigationTitle("Mi plan")
+        }
+    }
+}
+
+// MARK: - Fila de entrenamiento
+
+private struct WorkoutRow: View {
+    let day: WorkoutDay
+
+    private var isToday: Bool {
+        PlanConstants.calendar.isDateInToday(day.date)
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Punto de color según el tipo.
+            Circle()
+                .fill(day.type.color)
+                .frame(width: 12, height: 12)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(day.date.weekdayAndDay)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(day.title)
+                    .font(.body)
+                    .fontWeight(isToday ? .semibold : .regular)
+
+                if !day.detail.isEmpty {
+                    Text(day.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+
+            if isToday {
+                Text("HOY")
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.accentColor))
+            }
+
+            if day.isCompleted {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            }
+        }
+        .padding(.vertical, 4)
+        .listRowBackground(isToday ? Color.accentColor.opacity(0.12) : nil)
+    }
+}
+
+// MARK: - Encabezado de semana
+
+private struct WeekHeader: View {
+    let title: String
+    let tag: String?
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            if let tag {
+                Text(tag)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(Capsule().fill(Color.orange.opacity(0.15)))
+            }
+        }
+    }
+}
+
+#Preview {
+    PlanView()
+        .modelContainer(PreviewData.container)
+}

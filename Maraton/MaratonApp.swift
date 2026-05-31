@@ -6,12 +6,26 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct MaratonApp: App {
+    let container: ModelContainer
+
+    init() {
+        do {
+            container = try ModelContainer(for: WorkoutDay.self)
+        } catch {
+            fatalError("No se pudo crear el ModelContainer: \(error)")
+        }
+        // Pre-carga el plan en el primer arranque.
+        WorkoutSeed.seedIfNeeded(context: container.mainContext)
+    }
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
         }
+        .modelContainer(container)
     }
 }
