@@ -79,6 +79,12 @@ enum WorkoutSeed {
     }
 
     private static let plan: [Week] = [
+        Week(title: "Pre-arranque", tag: nil, entries: [
+            Entry(year: 2026, month: 5, day: 26, title: "Fuerza A", detail: "Empuje + pierna + core", type: .fuerza),
+            Entry(year: 2026, month: 5, day: 27, title: "Rodaje suave 5 km", detail: "Z2", type: .rodaje),
+            Entry(year: 2026, month: 5, day: 28, title: "Calidad · 2×10' tempo", detail: "(7/10), 3' trote", type: .calidad),
+            Entry(year: 2026, month: 5, day: 29, title: "Fuerza B", detail: "Tirón + core", type: .fuerza),
+        ]),
         Week(title: "Arranque", tag: nil, entries: [
             Entry(year: 2026, month: 5, day: 30, title: "Descanso + movilidad 10'", detail: "", type: .descanso),
             Entry(year: 2026, month: 5, day: 31, title: "Fondo largo 12 km", detail: "Z2 conversacional", type: .fondo),
@@ -163,5 +169,21 @@ enum WorkoutSeed {
             context.insert(day)
         }
         try? context.save()
+    }
+
+    /// Reconcilia el plan: inserta los días del plan canónico que todavía no
+    /// existan (comparando por fecha), sin modificar los días ya presentes.
+    /// Permite agregar días nuevos al plan sin perder el progreso registrado.
+    static func syncPlan(context: ModelContext) {
+        guard let existentes = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
+        let cal = PlanConstants.calendar
+        let fechasExistentes = Set(existentes.map { cal.startOfDay(for: $0.date) })
+
+        var inserto = false
+        for day in allWorkoutDays() where !fechasExistentes.contains(cal.startOfDay(for: day.date)) {
+            context.insert(day)
+            inserto = true
+        }
+        if inserto { try? context.save() }
     }
 }

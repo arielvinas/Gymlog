@@ -11,13 +11,16 @@ import SwiftData
 struct PlanView: View {
     @Query(sort: \WorkoutDay.date) private var days: [WorkoutDay]
 
-    /// Días agrupados por semana, ordenados por `weekOrder`.
+    /// Días agrupados por semana, ordenados por la fecha de su primer día.
     private var weeks: [(title: String, tag: String?, days: [WorkoutDay])] {
-        let grouped = Dictionary(grouping: days, by: { $0.weekOrder })
-        return grouped.keys.sorted().compactMap { order in
-            guard let weekDays = grouped[order], let first = weekDays.first else { return nil }
-            return (title: first.weekTitle, tag: first.weekTag, days: weekDays)
-        }
+        // `days` ya viene ordenado por fecha, así que cada grupo queda ordenado.
+        let grouped = Dictionary(grouping: days, by: { $0.weekTitle })
+        return grouped.values
+            .sorted { ($0.first?.date ?? .distantPast) < ($1.first?.date ?? .distantPast) }
+            .compactMap { weekDays in
+                guard let first = weekDays.first else { return nil }
+                return (title: first.weekTitle, tag: first.weekTag, days: weekDays)
+            }
     }
 
     var body: some View {
