@@ -14,6 +14,7 @@ enum PreviewData {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try! ModelContainer(
             for: WorkoutDay.self, Exercise.self, ExerciseSet.self, DailyCheckIn.self,
+            SupplementLog.self, SupplementReminder.self,
             configurations: config
         )
         WorkoutSeed.seedIfNeeded(context: container.mainContext)

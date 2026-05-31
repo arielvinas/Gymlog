@@ -9,6 +9,8 @@ import SwiftUI
 import SwiftData
 
 struct RootView: View {
+    @Environment(\.modelContext) private var context
+
     var body: some View {
         TabView {
             TodayView()
@@ -25,6 +27,12 @@ struct RootView: View {
                 .tabItem {
                     Label("Progreso", systemImage: "chart.bar.fill")
                 }
+        }
+        .task {
+            // Reprograma los recordatorios activos (p. ej. tras reinstalar).
+            if let reminders = try? context.fetch(FetchDescriptor<SupplementReminder>()) {
+                NotificationManager.shared.rescheduleAll(reminders)
+            }
         }
     }
 }

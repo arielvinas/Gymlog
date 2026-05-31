@@ -67,6 +67,7 @@ struct ProgressDashboardView: View {
 
                     ReadinessCard(readiness: readiness)
                     ConsistencyCard(weekStreak: weekStreak)
+                    SupplementsProgressCard()
                     ProjectionCard(projection: projection)
                     StrengthEvolutionCard(improvements: improvements)
                 }

@@ -27,6 +27,7 @@ struct TodayView: View {
                 VStack(spacing: 16) {
                     TodayHeroCard(day: todayWorkout)
                     CheckInCard(existing: todayCheckIn)
+                    SupplementsTodayCard()
                 }
                 .padding()
             }
