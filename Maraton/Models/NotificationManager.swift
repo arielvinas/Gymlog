@@ -63,12 +63,57 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         "supplement-reminder-\(kind.rawValue)"
     }
 
+    // MARK: - Cronómetro de descanso (sesión guiada de gimnasio)
+
+    /// Identificador de la notificación de fin de descanso. Es única: cada
+    /// descanso reemplaza a la anterior.
+    nonisolated private static let restTimerIdentifier = "gym-rest-timer-end"
+
+    /// Agenda una notificación local para avisar el fin del descanso, de modo
+    /// que el aviso (sonido + vibración del sistema) llegue aunque la pantalla
+    /// esté bloqueada o la app en segundo plano. En primer plano el aviso lo da
+    /// la propia vista, así que acá se suprime el sonido (ver `willPresent`).
+    func scheduleRestEnd(after seconds: Int) {
+        cancelRestEnd()
+        guard seconds > 0 else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "Descanso terminado"
+        content.body = "Dale con la próxima serie."
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: TimeInterval(seconds),
+            repeats: false
+        )
+        let request = UNNotificationRequest(
+            identifier: Self.restTimerIdentifier,
+            content: content,
+            trigger: trigger
+        )
+        center.add(request)
+    }
+
+    /// Cancela la notificación de fin de descanso pendiente (al saltear el
+    /// descanso, volver atrás o cerrar la sesión).
+    func cancelRestEnd() {
+        center.removePendingNotificationRequests(withIdentifiers: [Self.restTimerIdentifier])
+        center.removeDeliveredNotifications(withIdentifiers: [Self.restTimerIdentifier])
+    }
+
     // Muestra la notificación aunque la app esté en primer plano.
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        completionHandler([.banner, .sound])
+        // El fin de descanso, en primer plano, ya lo anuncia la vista con sonido
+        // y vibración: mostramos solo el banner para no duplicar el sonido.
+        if notification.request.identifier == Self.restTimerIdentifier {
+            completionHandler([.banner])
+        } else {
+            completionHandler([.banner, .sound])
+        }
     }
 }

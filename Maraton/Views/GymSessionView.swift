@@ -14,11 +14,26 @@ struct GymSessionView: View {
 
     @State private var showingAddExercise = false
     @State private var newExerciseName = ""
+    @State private var showingGuidedSession = false
 
     var body: some View {
         List {
             if day.exercises.isEmpty {
                 emptyState
+            } else {
+                Section {
+                    Button {
+                        showingGuidedSession = true
+                    } label: {
+                        Label("Empezar sesión guiada", systemImage: "play.fill")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .foregroundStyle(.white)
+                            .padding(.vertical, 6)
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(WorkoutType.fuerza.color)
+                }
             }
 
             ForEach(day.orderedExercises) { exercise in
@@ -44,6 +59,9 @@ struct GymSessionView: View {
             Button("Cancelar", role: .cancel) {}
         } message: {
             Text("Ingresá el nombre del ejercicio.")
+        }
+        .fullScreenCover(isPresented: $showingGuidedSession) {
+            GuidedGymSessionView(day: day)
         }
     }
 
