@@ -21,16 +21,26 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
   `RootView.swift` (`#if targetEnvironment(macCatalyst)`).
 
 ## Estructura del código
-- `Maraton/Models/` — modelos SwiftData (`WorkoutDay`, `Exercise`, `ExerciseSet`,
-  `SupplementLog`, `SupplementReminder`) + helpers de cálculo
-  (`RaceProjection`, `StreakCalculator`, `StrengthProgress`,
-  `SupplementTracker`, `ExerciseHistory`) + `HealthManager`, `NotificationManager`,
-  `WorkoutSeed`, `WeekAssigner`, formateadores.
-- `Maraton/Views/` — `RootView` (adaptable), `TodayView`, `PlanView`,
-  `WorkoutDetailView`, `WorkoutEditView`, `GymSessionView`, `CompletionFormView`,
-  `ProgressDashboardView`, tarjetas del dashboard, `SupplementSettingsView`.
-- Proyecto usa **PBXFileSystemSynchronizedRootGroup**: los archivos nuevos en
-  `Maraton/` se agregan solos al target (no hace falta editar el `.pbxproj`).
+Tres carpetas = tres grupos sincronizados:
+- `Shared/` — **código agnóstico de plataforma, compilado por iOS Y watchOS.**
+  Modelos SwiftData (`WorkoutDay`, `Exercise`, `ExerciseSet`, `SupplementLog`,
+  `SupplementReminder`), helpers (`WorkoutSeed`, `StrengthSeed`, `ExerciseHistory`,
+  `PlanConstants`, formateadores), `GuidedSessionEngine` (máquina de estados de la
+  sesión de gimnasio guiada, **compartida iPhone ↔ reloj**) y `AppData` (schema,
+  creación del `ModelContainer` y sembrado; dueño del flag `iCloudSyncEnabled`).
+- `Maraton/` — app iOS/Catalyst (solo target Maraton). `Maraton/Views/` (`RootView`,
+  `TodayView`, `PlanView`, `WorkoutDetailView`, `WorkoutEditView`, `GymSessionView`,
+  `GuidedGymSessionView`, etc.), `MaratonApp`, y helpers iOS (`HealthManager`,
+  `NotificationManager`, `RaceProjection`, `StreakCalculator`, `StrengthProgress`,
+  `SupplementTracker`, `WeekAssigner`, `PreviewData`).
+- `MaratonWatch Watch App/` — app del reloj (solo target watchOS). `MaratonWatchApp`,
+  `WatchRootView` (día de gimnasio de hoy/próximo + Empezar), `WatchGuidedSessionView`
+  (corona digital + botones, descanso con vibración, pulso en vivo), `WatchWorkoutManager`
+  (HR/calorías vía `HKWorkoutSession`), `Info.plist`, `MaratonWatch.entitlements`, `Assets`.
+- Proyecto usa **PBXFileSystemSynchronizedRootGroup**: los archivos nuevos en una
+  carpeta se agregan solos a los targets que la incluyen (no hace falta editar el
+  `.pbxproj`). El `Info.plist` del reloj queda excluido de recursos vía
+  `membershipExceptions` (si no, choca con `INFOPLIST_FILE`).
 
 ## Build / deploy (CLI)
 - **iPhone físico:** "iPhone de Ariel", iPhone 15 Pro, UDID
@@ -57,6 +67,27 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
   ```
   Para correrla desde Xcode con la cuenta: re-loguear en Xcode
   (Settings → Accounts) y registrar la Mac.
+- **Apple Watch (companion):** target `MaratonWatch Watch App`, bundle
+  `ariel.Maraton.watchkitapp`, embebido en la app iOS.
+  - ⚠️ **Requiere el platform de watchOS instalado** (Xcode → Settings → Components
+    o `xcodebuild -downloadPlatform watchOS`). Como el target iOS **embebe** el
+    reloj, sin el platform **tampoco compila el iPhone**.
+  - Compilar/correr en simulador:
+    ```sh
+    xcodebuild -project Maraton.xcodeproj -scheme "MaratonWatch Watch App" \
+      -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm)' \
+      -configuration Debug -derivedDataPath /tmp/maraton-watch build
+    xcrun simctl boot "Apple Watch Series 11 (46mm)"
+    xcrun simctl install booted \
+      "/tmp/maraton-watch/Build/Products/Debug-watchsimulator/MaratonWatch Watch App.app"
+    xcrun simctl launch booted ariel.Maraton.watchkitapp
+    ```
+  - El **pulso en vivo** real necesita un **Apple Watch físico emparejado** (el
+    simulador no genera HR real). Las métricas (HR prom., calorías, duración) se
+    guardan en el `WorkoutDay` del día (campos `avgHeartRate`/`activeCalories`/
+    `durationMinutes`), igual que el import de Apple Salud del iPhone.
+  - Catalyst no compila el reloj gracias a `platformFilter = ios` en la dependencia
+    y en la fase "Embed Watch Content".
 
 ## Pendientes / próximos pasos posibles
 - Activar iCloud (ver sección abajo) — requiere cuenta de pago.
@@ -73,8 +104,11 @@ sincronizan automáticamente sin más cambios.
 
 La capa de datos ya quedó **preparada** (bajo riesgo, sin tocar datos actuales):
 - Todos los `@Model` tienen valores por defecto (requisito de CloudKit).
-- `ModelContainer` detrás del flag `MaratonApp.iCloudSyncEnabled` (hoy `false`
+- `ModelContainer` detrás del flag `AppData.iCloudSyncEnabled` (hoy `false`
   → almacenamiento local, offline-first; el código CloudKit con fallback ya está).
+  El reloj usa el **mismo** `AppData` (schema/container/flag): hoy cada dispositivo
+  tiene su store local sembrado con el mismo plan; al activar iCloud, iPhone, Mac y
+  reloj sincronizan con el mismo interruptor.
 - Flag de sembrado del plan listo para usar iCloud Key-Value Store cuando se active.
 
 ### Pasos para activar iCloud (cuando haya cuenta de pago)
@@ -88,7 +122,9 @@ La capa de datos ya quedó **preparada** (bajo riesgo, sin tocar datos actuales)
    `INFOPLIST_KEY_UIBackgroundModes = "remote-notification";`.
 3. Quitar `@Attribute(.unique)` de `WorkoutDay.date`
    (CloudKit no admite constraints únicos; la unicidad ya se valida por código).
-4. `MaratonApp.iCloudSyncEnabled = true`.
+   Agregar el mismo entitlement de iCloud al reloj (`MaratonWatch.entitlements`),
+   con el mismo contenedor CloudKit, para que comparta datos con el iPhone.
+4. `AppData.iCloudSyncEnabled = true` (vale para iPhone, Mac y reloj).
 5. Compilar para device con `-allowProvisioningUpdates` (la firma automática
    registra el contenedor `iCloud.ariel.Maraton` y la capability de Push).
 
