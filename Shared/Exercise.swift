@@ -26,6 +26,9 @@ final class Exercise {
     /// Rango de repeticiones objetivo (ej. "6-8"). Solo guía; no se completa.
     var targetReps: String?
 
+    /// Descanso recomendado entre series, en segundos. Editable por el usuario.
+    var restSeconds: Int?
+
     /// Día de entrenamiento al que pertenece.
     var day: WorkoutDay?
 
@@ -39,6 +42,7 @@ final class Exercise {
         dayDate: Date,
         notes: String? = nil,
         targetReps: String? = nil,
+        restSeconds: Int? = nil,
         day: WorkoutDay? = nil
     ) {
         self.name = name
@@ -46,7 +50,16 @@ final class Exercise {
         self.dayDate = dayDate
         self.notes = notes
         self.targetReps = targetReps
+        self.restSeconds = restSeconds
         self.day = day
+    }
+
+    /// Descanso por defecto cuando un ejercicio todavía no tiene uno definido.
+    static let defaultRestSeconds = 90
+
+    /// Descanso recomendado, usando el por defecto si no hay uno guardado.
+    var restOrDefault: Int {
+        restSeconds ?? Exercise.defaultRestSeconds
     }
 
     /// Series ordenadas por su número.

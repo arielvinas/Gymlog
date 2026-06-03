@@ -16,6 +16,11 @@
 			path = Maraton;
 			sourceTree = "<group>";
 		};
+		DA7A00010000000000000001 /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -33,6 +38,7 @@
 			isa = PBXGroup;
 			children = (
 				B247CCDC2FCBCA3400BD532C /* Maraton */,
+				DA7A00010000000000000001 /* Shared */,
 				B247CCDB2FCBCA3400BD532C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -62,6 +68,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				B247CCDC2FCBCA3400BD532C /* Maraton */,
+				DA7A00010000000000000001 /* Shared */,
 			);
 			name = Maraton;
 			packageProductDependencies = (

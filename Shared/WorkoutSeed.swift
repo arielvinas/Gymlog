@@ -170,14 +170,14 @@ enum WorkoutSeed {
     /// reinstalar o estrenar un dispositivo nuevo; si no, sólo local.
     private static var storedVersion: Int {
         let local = UserDefaults.standard.integer(forKey: versionKey)
-        guard MaratonApp.iCloudSyncEnabled else { return local }
+        guard AppData.iCloudSyncEnabled else { return local }
         let cloud = Int(NSUbiquitousKeyValueStore.default.longLong(forKey: versionKey))
         return max(cloud, local)
     }
 
     private static func markSeeded(_ version: Int) {
         UserDefaults.standard.set(version, forKey: versionKey)
-        if MaratonApp.iCloudSyncEnabled {
+        if AppData.iCloudSyncEnabled {
             NSUbiquitousKeyValueStore.default.set(Int64(version), forKey: versionKey)
             NSUbiquitousKeyValueStore.default.synchronize()
         }

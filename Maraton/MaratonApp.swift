@@ -14,47 +14,11 @@ struct MaratonApp: App {
     @State private var navigator = Navigator()
 
     init() {
-        container = MaratonApp.makeContainer()
+        container = AppData.makeContainer()
 
-        // Pre-carga el plan en el primer arranque y aplica las novedades del
-        // plan (una vez por versión), respetando los días editados o borrados.
-        // El flag de sembrado vive en iCloud para no duplicar datos al
-        // reinstalar o estrenar un dispositivo nuevo.
-        WorkoutSeed.seedIfNeeded(context: container.mainContext)
-        WorkoutSeed.applyPlanUpdates(context: container.mainContext)
-
-        // Carga la rutina de fuerza (DÍA A / DÍA B) en los días de fuerza que
-        // todavía no tienen ejercicios, sin pisar lo que el usuario ya editó.
-        StrengthSeed.populateIfNeeded(context: container.mainContext)
-    }
-
-    /// Activar cuando haya Apple Developer Program (de pago) + las capabilities
-    /// de iCloud/CloudKit/Push reactivadas. Los equipos personales (cuenta
-    /// gratuita) no admiten CloudKit, así que por ahora el almacenamiento es local.
-    static let iCloudSyncEnabled = false
-
-    /// Crea el contenedor. Con `iCloudSyncEnabled` usa CloudKit (con respaldo
-    /// local si no está disponible); si no, almacenamiento local — offline-first.
-    private static func makeContainer() -> ModelContainer {
-        let schema = Schema([
-            WorkoutDay.self, Exercise.self, ExerciseSet.self,
-            SupplementLog.self, SupplementReminder.self,
-        ])
-
-        if iCloudSyncEnabled {
-            let cloudConfig = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
-            if let container = try? ModelContainer(for: schema, configurations: cloudConfig) {
-                return container
-            }
-        }
-
-        // Almacenamiento local (la app funciona igual sin iCloud).
-        let localConfig = ModelConfiguration(schema: schema, cloudKitDatabase: .none)
-        if let container = try? ModelContainer(for: schema, configurations: localConfig) {
-            return container
-        }
-
-        fatalError("No se pudo crear el ModelContainer")
+        // Pre-carga el plan, aplica novedades por versión y siembra la rutina
+        // de fuerza (lógica compartida con la app del reloj, en `AppData`).
+        AppData.seed(context: container.mainContext)
     }
 
     var body: some Scene {

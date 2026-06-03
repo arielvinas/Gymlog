@@ -13,47 +13,49 @@ import SwiftData
 enum StrengthSeed {
 
     /// Plantilla de un ejercicio: nombre, cantidad de series, rango de reps
-    /// objetivo y una nota/etiqueta opcional. `sets == 0` indica un ejercicio
-    /// sin carga (core), cuyo detalle vive en `note`.
+    /// objetivo, una nota/etiqueta opcional y el descanso recomendado entre
+    /// series (segundos). `sets == 0` indica un ejercicio sin carga (core),
+    /// cuyo detalle vive en `note`.
     struct ExerciseTemplate {
         let name: String
         let sets: Int
         let reps: String
         let note: String?
+        let rest: Int
     }
 
     // MARK: - DÍA A · Empuje + pierna + core (martes)
 
     static let dayA: [ExerciseTemplate] = [
         ExerciseTemplate(name: "Empuje de pecho con barra en banco plano", sets: 3, reps: "6-8",
-                         note: "El fuerte del día · carga exigente"),
-        ExerciseTemplate(name: "Empuje de hombros en Hammer", sets: 3, reps: "8-10", note: nil),
+                         note: "El fuerte del día · carga exigente", rest: 120),
+        ExerciseTemplate(name: "Empuje de hombros en Hammer", sets: 3, reps: "8-10", note: nil, rest: 90),
         ExerciseTemplate(name: "Apertura de pecho con mancuernas en banco inclinado", sets: 2, reps: "12-15",
-                         note: "Accesorio · moderado"),
-        ExerciseTemplate(name: "Vuelos laterales con mancuernas", sets: 3, reps: "12-15", note: nil),
-        ExerciseTemplate(name: "Tríceps en polea (agarre prono) o press francés", sets: 3, reps: "10-12", note: nil),
+                         note: "Accesorio · moderado", rest: 60),
+        ExerciseTemplate(name: "Vuelos laterales con mancuernas", sets: 3, reps: "12-15", note: nil, rest: 45),
+        ExerciseTemplate(name: "Tríceps en polea (agarre prono) o press francés", sets: 3, reps: "10-12", note: nil, rest: 60),
         ExerciseTemplate(name: "Sentadilla copa", sets: 3, reps: "8-10",
-                         note: "Mantenimiento · sin fallo · cuidá las piernas"),
+                         note: "Mantenimiento · sin fallo · cuidá las piernas", rest: 90),
         ExerciseTemplate(name: "Hip thrust con barra", sets: 3, reps: "10-12",
-                         note: "Glúteo · te protege como corredor"),
+                         note: "Glúteo · te protege como corredor", rest: 90),
         ExerciseTemplate(name: "Core", sets: 0, reps: "",
-                         note: "Bicho muerto 3×10 por lado · Plancha prona alta 3×30 s"),
+                         note: "Bicho muerto 3×10 por lado · Plancha prona alta 3×30 s", rest: 45),
     ]
 
     // MARK: - DÍA B · Tirón + core (viernes)
 
     static let dayB: [ExerciseTemplate] = [
-        ExerciseTemplate(name: "Remo con barra en landmine (o remo colgado en barra)", sets: 3, reps: "8-10", note: nil),
-        ExerciseTemplate(name: "Tirón dorsal en polea con agarre supino", sets: 3, reps: "8-10", note: nil),
-        ExerciseTemplate(name: "Remo en polea baja con toma neutra abierta", sets: 2, reps: "12", note: nil),
-        ExerciseTemplate(name: "Bíceps con barra toma supina", sets: 3, reps: "8-10", note: nil),
-        ExerciseTemplate(name: "Bíceps martillo", sets: 2, reps: "10-12", note: nil),
+        ExerciseTemplate(name: "Remo con barra en landmine (o remo colgado en barra)", sets: 3, reps: "8-10", note: nil, rest: 120),
+        ExerciseTemplate(name: "Tirón dorsal en polea con agarre supino", sets: 3, reps: "8-10", note: nil, rest: 90),
+        ExerciseTemplate(name: "Remo en polea baja con toma neutra abierta", sets: 2, reps: "12", note: nil, rest: 60),
+        ExerciseTemplate(name: "Bíceps con barra toma supina", sets: 3, reps: "8-10", note: nil, rest: 75),
+        ExerciseTemplate(name: "Bíceps martillo", sets: 2, reps: "10-12", note: nil, rest: 60),
         ExerciseTemplate(name: "Vuelos posteriores con mancuernas", sets: 2, reps: "12-15",
-                         note: "Postura + hombro sano"),
+                         note: "Postura + hombro sano", rest: 45),
         ExerciseTemplate(name: "Flexión de rodillas acostado (camilla)", sets: 2, reps: "12-15",
-                         note: "Isquios livianos · previene lesión al correr"),
+                         note: "Isquios livianos · previene lesión al correr", rest: 60),
         ExerciseTemplate(name: "Core", sets: 0, reps: "",
-                         note: "Twist ruso 3×20 · Puente lateral con rotación 3×10 por lado"),
+                         note: "Twist ruso 3×20 · Puente lateral con rotación 3×10 por lado", rest: 45),
     ]
 
     /// Devuelve la rutina que corresponde a un día de fuerza según su título.
@@ -72,7 +74,7 @@ enum StrengthSeed {
             .map { t in
                 let reducedSets = t.sets == 0 ? 0 : max(1, (t.sets + 1) / 2)
                 let note = t.sets == 0 ? t.note : "Taper · mitad de series, carga cómoda"
-                return ExerciseTemplate(name: t.name, sets: reducedSets, reps: t.reps, note: note)
+                return ExerciseTemplate(name: t.name, sets: reducedSets, reps: t.reps, note: note, rest: t.rest)
             }
     }
 
@@ -83,21 +85,22 @@ enum StrengthSeed {
 
     // MARK: - Sembrado
 
-    /// v2: las reps objetivo pasan a su propio campo (`targetReps`) y se
-    /// completan también en los ejercicios ya sembrados por la v1.
-    static let version = 2
+    /// v2: las reps objetivo pasan a su propio campo (`targetReps`).
+    /// v3: se agrega el descanso recomendado por ejercicio (`restSeconds`),
+    /// completándolo también en los ejercicios ya sembrados.
+    static let version = 3
     private static let versionKey = "seededStrengthVersion"
 
     private static var storedVersion: Int {
         let local = UserDefaults.standard.integer(forKey: versionKey)
-        guard MaratonApp.iCloudSyncEnabled else { return local }
+        guard AppData.iCloudSyncEnabled else { return local }
         let cloud = Int(NSUbiquitousKeyValueStore.default.longLong(forKey: versionKey))
         return max(cloud, local)
     }
 
     private static func markSeeded() {
         UserDefaults.standard.set(version, forKey: versionKey)
-        if MaratonApp.iCloudSyncEnabled {
+        if AppData.iCloudSyncEnabled {
             NSUbiquitousKeyValueStore.default.set(Int64(version), forKey: versionKey)
             NSUbiquitousKeyValueStore.default.synchronize()
         }
@@ -123,6 +126,7 @@ enum StrengthSeed {
                         dayDate: day.date,
                         notes: template.note,
                         targetReps: target(for: template),
+                        restSeconds: template.rest,
                         day: day
                     )
                     context.insert(exercise)
@@ -131,12 +135,19 @@ enum StrengthSeed {
                     }
                 }
             } else {
-                // Migración v1 → v2: separa las reps objetivo a su propio campo.
+                // Migración de ejercicios ya sembrados: completa reps objetivo
+                // (v2) y descanso recomendado (v3) sin pisar lo que el usuario
+                // haya editado (solo rellena los campos que falten).
                 let byName = Dictionary(uniqueKeysWithValues: routine.map { ($0.name, $0) })
-                for exercise in day.exercises where exercise.targetReps == nil {
+                for exercise in day.exercises {
                     guard let template = byName[exercise.name] else { continue }
-                    exercise.targetReps = target(for: template)
-                    exercise.notes = template.note
+                    if exercise.targetReps == nil {
+                        exercise.targetReps = target(for: template)
+                        exercise.notes = template.note
+                    }
+                    if exercise.restSeconds == nil {
+                        exercise.restSeconds = template.rest
+                    }
                 }
             }
         }
