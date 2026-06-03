@@ -34,9 +34,11 @@ Tres carpetas = tres grupos sincronizados:
   `NotificationManager`, `RaceProjection`, `StreakCalculator`, `StrengthProgress`,
   `SupplementTracker`, `WeekAssigner`, `PreviewData`).
 - `MaratonWatch Watch App/` — app del reloj (solo target watchOS). `MaratonWatchApp`,
-  `WatchRootView` (día de gimnasio de hoy/próximo + Empezar), `WatchGuidedSessionView`
-  (corona digital + botones, descanso con vibración, pulso en vivo), `WatchWorkoutManager`
-  (HR/calorías vía `HKWorkoutSession`), `Info.plist`, `MaratonWatch.entitlements`, `Assets`.
+  `WatchTodayView` (carrusel deslizable de días del plan que arranca en hoy: qué toca
+  + suplementos por día, reutiliza `DailyPlanInfo`/`SupplementTracker`), `WatchWorkoutView`
+  (detalle del día + Empezar en días de fuerza), `WatchGuidedSessionView` (corona digital
+  + botones, descanso con vibración, pulso en vivo), `WatchWorkoutManager` (HR/calorías vía
+  `HKWorkoutSession`), `Info.plist`, `MaratonWatch.entitlements`, `Assets`.
 - Proyecto usa **PBXFileSystemSynchronizedRootGroup**: los archivos nuevos en una
   carpeta se agregan solos a los targets que la incluyen (no hace falta editar el
   `.pbxproj`). El `Info.plist` del reloj queda excluido de recursos vía
@@ -75,9 +77,9 @@ Tres carpetas = tres grupos sincronizados:
   - Compilar/correr en simulador:
     ```sh
     xcodebuild -project Maraton.xcodeproj -scheme "MaratonWatch Watch App" \
-      -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm)' \
+      -destination 'platform=watchOS Simulator,name=Apple Watch Series 7 (45mm)' \
       -configuration Debug -derivedDataPath /tmp/maraton-watch build
-    xcrun simctl boot "Apple Watch Series 11 (46mm)"
+    xcrun simctl boot "Apple Watch Series 7 (45mm)"
     xcrun simctl install booted \
       "/tmp/maraton-watch/Build/Products/Debug-watchsimulator/MaratonWatch Watch App.app"
     xcrun simctl launch booted ariel.Maraton.watchkitapp
@@ -88,6 +90,28 @@ Tres carpetas = tres grupos sincronizados:
     `durationMinutes`), igual que el import de Apple Salud del iPhone.
   - Catalyst no compila el reloj gracias a `platformFilter = ios` en la dependencia
     y en la fase "Embed Watch Content".
+  - **Instalar en el Apple Watch físico** ("Apple Watch de Ariel", Series 7 45mm,
+    UDID hardware `<UDID-RELOJ>`, id CoreDevice
+    `<COREDEVICE-ID-RELOJ>`):
+    - ⚠️ Primero la Mac tiene que **poder conectarse al reloj**: abrir Xcode →
+      Window → Devices and Simulators → seleccionar el reloj → "Preparing for
+      development" hasta que figure disponible (misma Wi-Fi, reloj desbloqueado y
+      cerca del iPhone). Si la Mac no lo "ve", el reloj sale como destino *no
+      elegible* con la versión de watchOS en blanco y la firma no lo registra.
+    - Con el reloj ya disponible:
+      ```sh
+      xcodebuild -project Maraton.xcodeproj -scheme "MaratonWatch Watch App" \
+        -destination 'id=<UDID-RELOJ>' -configuration Debug \
+        -derivedDataPath /tmp/maraton-watch-dev -allowProvisioningUpdates build
+      xcrun devicectl device install app --device <COREDEVICE-ID-RELOJ> \
+        "/tmp/maraton-watch-dev/Build/Products/Debug-watchos/MaratonWatch Watch App.app"
+      xcrun devicectl device process launch --device <COREDEVICE-ID-RELOJ> \
+        ariel.Maraton.watchkitapp
+      ```
+    - Cuenta gratuita ⇒ la firma **vence a los 7 días**; se reinstala con los
+      mismos comandos. La primera vez puede pedir confiar el perfil de desarrollo
+      en el reloj (Ajustes → General → Gestión de dispositivos y VPN → Confiar).
+    - El pulso en vivo **sí** funciona en el reloj físico (en el simulador no).
 
 ## Pendientes / próximos pasos posibles
 - Activar iCloud (ver sección abajo) — requiere cuenta de pago.

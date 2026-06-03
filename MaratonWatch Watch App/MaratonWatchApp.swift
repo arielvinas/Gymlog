@@ -23,7 +23,7 @@ struct MaratonWatchApp: App {
 
     var body: some Scene {
         WindowGroup {
-            WatchRootView()
+            WatchTodayView()
         }
         .modelContainer(container)
     }
