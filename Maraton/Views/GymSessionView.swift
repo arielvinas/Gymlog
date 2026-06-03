@@ -102,7 +102,7 @@ private struct ExerciseSection: View {
     var body: some View {
         Section {
             ForEach(exercise.orderedSets) { set in
-                SetRow(set: set, index: set.order)
+                SetRow(set: set, index: set.order, targetReps: exercise.targetReps)
             }
             .onDelete(perform: eliminarSeries)
 
@@ -124,23 +124,39 @@ private struct ExerciseSection: View {
     }
 
     private var header: some View {
-        HStack {
-            Text(exercise.name)
-                .font(.headline)
-                .textCase(nil)
-            Spacer()
-            Menu {
-                Button {
-                    renameText = exercise.name
-                    showingRename = true
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(exercise.name)
+                    .font(.headline)
+                    .textCase(nil)
+                Spacer()
+                Menu {
+                    Button {
+                        renameText = exercise.name
+                        showingRename = true
+                    } label: {
+                        Label("Renombrar", systemImage: "pencil")
+                    }
+                    Button(role: .destructive, action: onDelete) {
+                        Label("Eliminar ejercicio", systemImage: "trash")
+                    }
                 } label: {
-                    Label("Renombrar", systemImage: "pencil")
+                    Image(systemName: "ellipsis.circle")
                 }
-                Button(role: .destructive, action: onDelete) {
-                    Label("Eliminar ejercicio", systemImage: "trash")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle")
+            }
+
+            if let target = exercise.targetReps {
+                Text("Objetivo: \(target) reps")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(WorkoutType.fuerza.color)
+                    .textCase(nil)
+            }
+
+            if let notes = exercise.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
             }
         }
         .alert("Renombrar ejercicio", isPresented: $showingRename) {
@@ -190,6 +206,7 @@ private struct ExerciseSection: View {
 private struct SetRow: View {
     @Bindable var set: ExerciseSet
     let index: Int
+    var targetReps: String?
 
     @Environment(\.modelContext) private var context
     @State private var weightText = ""
@@ -210,7 +227,7 @@ private struct SetRow: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            field(placeholder: "reps", text: $repsText, keyboard: .numberPad)
+            field(placeholder: targetReps ?? "reps", text: $repsText, keyboard: .numberPad)
                 .onChange(of: repsText) { _, nuevo in
                     set.reps = Int(nuevo)
                 }

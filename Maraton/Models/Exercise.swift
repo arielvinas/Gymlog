@@ -20,8 +20,11 @@ final class Exercise {
     /// facilitar la búsqueda del histórico "última vez").
     var dayDate: Date = Date()
 
-    /// Notas opcionales del ejercicio.
+    /// Notas opcionales del ejercicio (ej. una etiqueta o consejo).
     var notes: String?
+
+    /// Rango de repeticiones objetivo (ej. "6-8"). Solo guía; no se completa.
+    var targetReps: String?
 
     /// Día de entrenamiento al que pertenece.
     var day: WorkoutDay?
@@ -35,12 +38,14 @@ final class Exercise {
         order: Int,
         dayDate: Date,
         notes: String? = nil,
+        targetReps: String? = nil,
         day: WorkoutDay? = nil
     ) {
         self.name = name
         self.order = order
         self.dayDate = dayDate
         self.notes = notes
+        self.targetReps = targetReps
         self.day = day
     }
 

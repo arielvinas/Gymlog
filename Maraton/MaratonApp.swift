@@ -22,6 +22,10 @@ struct MaratonApp: App {
         // reinstalar o estrenar un dispositivo nuevo.
         WorkoutSeed.seedIfNeeded(context: container.mainContext)
         WorkoutSeed.applyPlanUpdates(context: container.mainContext)
+
+        // Carga la rutina de fuerza (DÍA A / DÍA B) en los días de fuerza que
+        // todavía no tienen ejercicios, sin pisar lo que el usuario ya editó.
+        StrengthSeed.populateIfNeeded(context: container.mainContext)
     }
 
     /// Activar cuando haya Apple Developer Program (de pago) + las capabilities
