@@ -30,10 +30,12 @@ final class WatchWorkoutManager: NSObject {
     private let energyType = HKQuantityType(.activeEnergyBurned)
     private let bpmUnit = HKUnit.count().unitDivided(by: .minute())
 
-    /// Pide permiso a Apple Salud para leer pulso/energía y guardar el workout.
+    /// Pide permiso a Apple Salud para leer y guardar el workout junto con sus
+    /// muestras de pulso y energía (así el entrenamiento queda con FC y calorías,
+    /// no solo la duración).
     func requestAuthorization() async {
         guard HKHealthStore.isHealthDataAvailable() else { return }
-        let share: Set = [HKQuantityType.workoutType()]
+        let share: Set<HKSampleType> = [HKQuantityType.workoutType(), heartRateType, energyType]
         let read: Set<HKObjectType> = [heartRateType, energyType]
         try? await store.requestAuthorization(toShare: share, read: read)
     }

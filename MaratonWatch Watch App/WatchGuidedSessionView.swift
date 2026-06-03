@@ -4,8 +4,9 @@
 //
 //  Sesión de gimnasio guiada desde la muñeca. Usa el `GuidedSessionEngine`
 //  compartido (misma lógica que el iPhone) y `WatchWorkoutManager` para el
-//  pulso en vivo. El peso/reps se cargan con la corona digital y botones
-//  grandes; entre series arranca el descanso con vibración al terminar.
+//  pulso en vivo. El peso/reps se cargan tocando el valor para seleccionarlo y
+//  girando la corona digital; sin nada seleccionado la corona hace scroll de la
+//  pantalla. Entre series arranca el descanso con vibración al terminar.
 //
 
 import SwiftUI
@@ -82,51 +83,50 @@ struct WatchGuidedSessionView: View {
     // MARK: - Descanso
 
     private var restingScreen: some View {
-        VStack(spacing: 6) {
-            hrChip
+        ScrollView {
+            VStack(spacing: 12) {
+                hrChip
 
-            Spacer(minLength: 0)
-
-            ZStack {
-                Circle()
-                    .stroke(Color.gray.opacity(0.3), lineWidth: 8)
-                Circle()
-                    .trim(from: 0, to: engine.restFraction)
-                    .stroke(tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.2), value: engine.restRemaining)
-                VStack(spacing: 0) {
-                    Text(engine.restRemaining.countdownLabel)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                    Text("descanso")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                ZStack {
+                    Circle()
+                        .stroke(Color.gray.opacity(0.3), lineWidth: 8)
+                    Circle()
+                        .trim(from: 0, to: engine.restFraction)
+                        .stroke(tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 0.2), value: engine.restRemaining)
+                    VStack(spacing: 0) {
+                        Text(engine.restRemaining.countdownLabel)
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                        Text("descanso")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-            }
-            .frame(width: 110, height: 110)
+                .frame(width: 110, height: 110)
 
-            HStack(spacing: 8) {
-                Button { engine.adjustRest(by: -15) } label: {
-                    Image(systemName: "minus")
+                HStack(spacing: 8) {
+                    Button { engine.adjustRest(by: -15) } label: {
+                        Image(systemName: "minus")
+                    }
+                    Button { engine.adjustRest(by: 15) } label: {
+                        Image(systemName: "plus")
+                    }
                 }
-                Button { engine.adjustRest(by: 15) } label: {
-                    Image(systemName: "plus")
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+
+                Button { engine.skipRest() } label: {
+                    Label("Saltear", systemImage: "forward.fill")
+                        .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(tint)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-
-            Spacer(minLength: 0)
-
-            Button { engine.skipRest() } label: {
-                Label("Saltear", systemImage: "forward.fill")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(tint)
+            .padding(.horizontal, 4)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal, 4)
     }
 
     // MARK: - Fin
@@ -229,8 +229,29 @@ private struct WatchLoggingView: View {
     let onDone: () -> Void
     let onBack: () -> Void
 
+    /// Qué valor está "agarrado" por la corona. `nil` ⇒ la corona hace scroll.
+    private enum Field { case weight, reps }
+    /// `armed` habilita la focusabilidad de la celda; `focused` le da el foco.
+    /// Se separan porque watchOS descarta la asignación de foco si la celda no
+    /// era focusable en el render anterior: primero la armamos (focusable) y
+    /// recién en el ciclo siguiente la enfocamos.
+    @State private var armed: Field?
+    @FocusState private var focused: Field?
+
     @State private var weight: Double = 0
     @State private var reps: Double = 0
+
+    /// Alterna qué valor maneja la corona. Al tocar de nuevo el activo, lo
+    /// suelta y la corona vuelve a hacer scroll.
+    private func toggle(_ field: Field) {
+        if armed == field {
+            armed = nil
+            focused = nil
+        } else {
+            armed = field
+            DispatchQueue.main.async { focused = field }
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -256,6 +277,11 @@ private struct WatchLoggingView: View {
 
                     weightControl
                     repsControl
+
+                    Text(armed == nil ? "Tocá un valor y girá la corona" : "Girá la corona para ajustar")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 2)
                 } else if let notes = exercise.notes, !notes.isEmpty {
                     Text(notes)
                         .font(.footnote)
@@ -289,62 +315,77 @@ private struct WatchLoggingView: View {
         .onAppear(perform: prefill)
     }
 
-    /// Peso: corona digital (paso 1.25 kg) + botones grandes.
+    /// Peso: tocá para seleccionar y girá la corona (paso 1.25 kg).
     private var weightControl: some View {
-        VStack(spacing: 2) {
-            Text("Peso")
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 10) {
-                Button { weight = max(0, weight - 1.25) } label: {
-                    Image(systemName: "minus")
-                }
-                Text(weight > 0 ? "\(weight.formattedKg) kg" : "—")
-                    .font(.title3.weight(.bold))
-                    .monospacedDigit()
-                    .frame(minWidth: 76)
-                Button { weight += 1.25 } label: {
-                    Image(systemName: "plus")
-                }
-            }
-            .buttonStyle(.bordered)
-        }
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 12).fill(tint.opacity(0.15)))
-        .focusable(true)
-        .digitalCrownRotation(
-            $weight,
-            from: 0,
-            through: 600,
-            by: 1.25,
-            sensitivity: .medium,
-            isContinuous: false,
-            isHapticFeedbackEnabled: true
-        )
+        valueCell(title: "Peso",
+                  value: weight > 0 ? "\(weight.formattedKg) kg" : "—",
+                  field: .weight)
+            .focusable(armed == .weight)
+            .focused($focused, equals: .weight)
+            .digitalCrownRotation(
+                $weight,
+                from: 0,
+                through: 600,
+                by: 1.25,
+                sensitivity: .medium,
+                isContinuous: false,
+                isHapticFeedbackEnabled: true
+            )
     }
 
-    /// Reps: botones grandes (rango chico, no necesita corona).
+    /// Reps: tocá para seleccionar y girá la corona (paso 1 rep).
     private var repsControl: some View {
-        VStack(spacing: 2) {
-            Text("Reps")
+        valueCell(title: "Reps",
+                  value: reps > 0 ? "\(Int(reps))" : "—",
+                  field: .reps)
+            .focusable(armed == .reps)
+            .focused($focused, equals: .reps)
+            .digitalCrownRotation(
+                $reps,
+                from: 0,
+                through: 100,
+                by: 1,
+                sensitivity: .low,
+                isContinuous: false,
+                isHapticFeedbackEnabled: true
+            )
+    }
+
+    /// Celda tocable que muestra un valor. Al tocarla, agarra la corona
+    /// (resalta con el tint); tocándola de nuevo la suelta y la corona
+    /// vuelve a hacer scroll de la pantalla.
+    private func valueCell(title: String, value: String, field: Field) -> some View {
+        let isActive = armed == field
+        return HStack(spacing: 8) {
+            Text(title)
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-            HStack(spacing: 10) {
-                Button { reps = max(0, reps - 1) } label: {
-                    Image(systemName: "minus")
-                }
-                Text(reps > 0 ? "\(Int(reps))" : "—")
-                    .font(.title3.weight(.bold))
-                    .monospacedDigit()
-                    .frame(minWidth: 76)
-                Button { reps += 1 } label: {
-                    Image(systemName: "plus")
-                }
+            Spacer(minLength: 0)
+            if isActive {
+                Image(systemName: "digitalcrown.arrow.clockwise")
+                    .font(.caption2)
+                    .foregroundStyle(tint)
             }
-            .buttonStyle(.bordered)
+            Text(value)
+                .font(.title3.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(isActive ? tint : .primary)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(isActive ? tint.opacity(0.25) : Color.gray.opacity(0.15))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(isActive ? tint : .clear, lineWidth: 2)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            toggle(field)
+        }
     }
 
     private func prefill() {
