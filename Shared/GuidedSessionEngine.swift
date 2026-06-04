@@ -42,7 +42,20 @@ final class GuidedSessionEngine {
     // Cronómetro de descanso.
     private(set) var restTotal = 0
     private(set) var restRemaining = 0
+    /// Segundos transcurridos una vez que el descanso llegó a 0 (tiempo extra).
+    /// Sigue contando hacia arriba hasta que el usuario confirma la próxima serie.
+    private(set) var restOvertime = 0
     private var restEndDate: Date?
+    /// Próximo segundo de tiempo extra en el que volver a avisar (vibrar).
+    private var nextOvertimeAlert = 0
+    /// Cada cuántos segundos de tiempo extra se repite el aviso.
+    private let overtimeAlertInterval = 10
+
+    /// `true` mientras el descanso ya se cumplió pero la próxima serie no se
+    /// confirmó: la UI muestra el tiempo extra en rojo.
+    var isRestOvertime: Bool {
+        phase == .resting && restRemaining == 0
+    }
 
     // Hooks de plataforma (no obligatorios).
     /// Se llama al arrancar/reprogramar un descanso, con los segundos restantes.
@@ -158,6 +171,7 @@ final class GuidedSessionEngine {
 
     private func advance() {
         restEndDate = nil
+        restOvertime = 0
         index += 1
         phase = .logging
     }
@@ -190,27 +204,35 @@ final class GuidedSessionEngine {
     private func startRest(seconds: Int) {
         restTotal = seconds
         restRemaining = seconds
+        restOvertime = 0
+        nextOvertimeAlert = 0
         restEndDate = Date().addingTimeInterval(TimeInterval(seconds))
         phase = .resting
         onRestStarted?(seconds)
     }
 
     /// La UI debe llamar a esto periódicamente (timer) mientras dura el descanso.
+    /// Al llegar a 0 no avanza solo: entra en "tiempo extra" y cuenta hacia
+    /// arriba, repitiendo el aviso, hasta que el usuario confirme la próxima
+    /// serie (`skipRest`).
     func tickRest(now: Date) {
         guard phase == .resting, let end = restEndDate else { return }
         let remaining = end.timeIntervalSince(now)
-        restRemaining = max(0, Int(remaining.rounded(.up)))
-        if remaining <= 0 {
-            restFinished()
+        if remaining > 0 {
+            restRemaining = Int(remaining.rounded(.up))
+            restOvertime = 0
+            return
+        }
+        restRemaining = 0
+        restOvertime = Int((-remaining).rounded(.down))
+        if restOvertime >= nextOvertimeAlert {
+            onRestAlert?()
+            nextOvertimeAlert += overtimeAlertInterval
         }
     }
 
-    private func restFinished() {
-        onRestAlert?()
-        onRestEnded?()
-        advance()
-    }
-
+    /// Confirma que se empieza la próxima serie: corta el descanso (o el tiempo
+    /// extra) y avanza. También es el "saltear descanso" cuando todavía corre.
     func skipRest() {
         onRestEnded?()
         advance()
@@ -223,6 +245,8 @@ final class GuidedSessionEngine {
         let newRemaining = max(1, Int(end.timeIntervalSinceNow.rounded(.up)) + delta)
         restEndDate = Date().addingTimeInterval(TimeInterval(newRemaining))
         restRemaining = newRemaining
+        restOvertime = 0
+        nextOvertimeAlert = 0
         restTotal = max(15, restTotal + delta)
 
         exercise.restSeconds = restTotal

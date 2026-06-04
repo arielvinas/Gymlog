@@ -26,7 +26,9 @@ Tres carpetas = tres grupos sincronizados:
   Modelos SwiftData (`WorkoutDay`, `Exercise`, `ExerciseSet`, `SupplementLog`,
   `SupplementReminder`), helpers (`WorkoutSeed`, `StrengthSeed`, `ExerciseHistory`,
   `PlanConstants`, formateadores), `GuidedSessionEngine` (máquina de estados de la
-  sesión de gimnasio guiada, **compartida iPhone ↔ reloj**) y `AppData` (schema,
+  sesión de gimnasio guiada, **compartida iPhone ↔ reloj**; al terminar el descanso
+  no avanza solo: cuenta *tiempo extra* en rojo y re-vibra cada 10 s hasta que el
+  usuario confirma la próxima serie con `skipRest`) y `AppData` (schema,
   creación del `ModelContainer` y sembrado; dueño del flag `iCloudSyncEnabled`).
 - `Maraton/` — app iOS/Catalyst (solo target Maraton). `Maraton/Views/` (`RootView`,
   `TodayView`, `PlanView`, `WorkoutDetailView`, `WorkoutEditView`, `GymSessionView`,
@@ -36,9 +38,14 @@ Tres carpetas = tres grupos sincronizados:
 - `MaratonWatch Watch App/` — app del reloj (solo target watchOS). `MaratonWatchApp`,
   `WatchTodayView` (carrusel deslizable de días del plan que arranca en hoy: qué toca
   + suplementos por día, reutiliza `DailyPlanInfo`/`SupplementTracker`), `WatchWorkoutView`
-  (detalle del día + Empezar en días de fuerza), `WatchGuidedSessionView` (corona digital
-  + botones, descanso con vibración, pulso en vivo), `WatchWorkoutManager` (HR/calorías vía
-  `HKWorkoutSession`), `Info.plist`, `MaratonWatch.entitlements`, `Assets`.
+  (detalle del día + Empezar en días de fuerza), `WatchGuidedSessionView` (peso/reps se
+  editan **tocando el valor** para "agarrarlo" con la corona digital —sin selección la
+  corona hace scroll; el foco se arma en dos pasos `armed`→`focused` porque watchOS
+  descarta el foco si la celda no era focusable en el render previo—; descanso con tiempo
+  extra en rojo y vibración; pulso en vivo), `WatchWorkoutManager` (pulso/calorías en vivo
+  vía `HKWorkoutSession` y, al terminar, guarda el `HKWorkout` de fuerza en Apple Salud),
+  `Info.plist`, `MaratonWatch.entitlements`, `Assets` (incluye el `AppIcon`, el mismo PNG
+  1024² del iPhone).
 - Proyecto usa **PBXFileSystemSynchronizedRootGroup**: los archivos nuevos en una
   carpeta se agregan solos a los targets que la incluyen (no hace falta editar el
   `.pbxproj`). El `Info.plist` del reloj queda excluido de recursos vía
@@ -88,6 +95,13 @@ Tres carpetas = tres grupos sincronizados:
     simulador no genera HR real). Las métricas (HR prom., calorías, duración) se
     guardan en el `WorkoutDay` del día (campos `avgHeartRate`/`activeCalories`/
     `durationMinutes`), igual que el import de Apple Salud del iPhone.
+  - Al terminar la sesión se **guarda como entrenamiento** (`HKWorkout` de fuerza
+    en interior) en Apple Salud, con pulso y calorías. El permiso de **escritura**
+    incluye `workoutType` + `heartRate` + `activeEnergyBurned` (si solo se comparte
+    `workoutType`, el workout se guarda pero sin FC ni calorías asociadas).
+  - ⚠️ Al cambiar el **`AppIcon` del reloj** hay que recompilar **limpio**
+    (`clean build`): el build incremental no reprocesa el icono y el `Info.plist`
+    queda sin `CFBundleIconName` (la app aparece sin icono).
   - Catalyst no compila el reloj gracias a `platformFilter = ios` en la dependencia
     y en la fase "Embed Watch Content".
   - **Instalar en el Apple Watch físico** ("Apple Watch de Ariel", Series 7 45mm,

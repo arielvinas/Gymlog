@@ -83,7 +83,8 @@ struct WatchGuidedSessionView: View {
     // MARK: - Descanso
 
     private var restingScreen: some View {
-        ScrollView {
+        let overtime = engine.isRestOvertime
+        return ScrollView {
             VStack(spacing: 12) {
                 hrChip
 
@@ -91,17 +92,18 @@ struct WatchGuidedSessionView: View {
                     Circle()
                         .stroke(Color.gray.opacity(0.3), lineWidth: 8)
                     Circle()
-                        .trim(from: 0, to: engine.restFraction)
-                        .stroke(tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .trim(from: 0, to: overtime ? 1 : engine.restFraction)
+                        .stroke(overtime ? Color.red : tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                         .animation(.linear(duration: 0.2), value: engine.restRemaining)
                     VStack(spacing: 0) {
-                        Text(engine.restRemaining.countdownLabel)
+                        Text(overtime ? "+\(engine.restOvertime.countdownLabel)" : engine.restRemaining.countdownLabel)
                             .font(.system(size: 34, weight: .bold, design: .rounded))
                             .monospacedDigit()
-                        Text("descanso")
+                            .foregroundStyle(overtime ? .red : .primary)
+                        Text(overtime ? "extra" : "descanso")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(overtime ? Color.red : .secondary)
                     }
                 }
                 .frame(width: 110, height: 110)
@@ -118,11 +120,12 @@ struct WatchGuidedSessionView: View {
                 .controlSize(.small)
 
                 Button { engine.skipRest() } label: {
-                    Label("Saltear", systemImage: "forward.fill")
+                    Label(overtime ? "Empezar serie" : "Saltear",
+                          systemImage: overtime ? "play.fill" : "forward.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(tint)
+                .tint(overtime ? .red : tint)
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 8)

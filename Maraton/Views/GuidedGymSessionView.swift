@@ -150,29 +150,31 @@ struct GuidedGymSessionView: View {
     // MARK: - Pantalla de descanso
 
     private var restingScreen: some View {
-        VStack(spacing: 0) {
+        let overtime = engine.isRestOvertime
+        return VStack(spacing: 0) {
             progressBar
 
             Spacer()
 
-            Text("Descanso")
+            Text(overtime ? "Tiempo extra" : "Descanso")
                 .font(.headline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(overtime ? Color.red : .secondary)
 
             ZStack {
                 Circle()
                     .stroke(Color(.systemGray5), lineWidth: 14)
                 Circle()
-                    .trim(from: 0, to: engine.restFraction)
-                    .stroke(tint, style: StrokeStyle(lineWidth: 14, lineCap: .round))
+                    .trim(from: 0, to: overtime ? 1 : engine.restFraction)
+                    .stroke(overtime ? Color.red : tint, style: StrokeStyle(lineWidth: 14, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.linear(duration: 0.1), value: engine.restRemaining)
 
                 VStack(spacing: 4) {
-                    Text(engine.restRemaining.countdownLabel)
+                    Text(overtime ? "+\(engine.restOvertime.countdownLabel)" : engine.restRemaining.countdownLabel)
                         .font(.system(size: 60, weight: .bold, design: .rounded))
                         .monospacedDigit()
-                    Text("de \(engine.restTotal.restLabel)")
+                        .foregroundStyle(overtime ? Color.red : .primary)
+                    Text(overtime ? "tocá para empezar la serie" : "de \(engine.restTotal.restLabel)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -207,8 +209,8 @@ struct GuidedGymSessionView: View {
             bottomBar(
                 backAction: engine.goBackFromResting,
                 backEnabled: true,
-                primaryTitle: "Saltear descanso",
-                primaryIcon: "forward.fill",
+                primaryTitle: overtime ? "Empezar serie" : "Saltear descanso",
+                primaryIcon: overtime ? "play.fill" : "forward.fill",
                 primaryAction: engine.skipRest
             )
         }
