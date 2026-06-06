@@ -17,7 +17,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .hoy:      return "Hoy"
+        case .hoy:      return "Detalle"
         case .plan:     return "Plan"
         case .progreso: return "Progreso"
         }
@@ -66,8 +66,8 @@ private struct TabRootView: View {
     var body: some View {
         @Bindable var navigator = navigator
         TabView(selection: $navigator.section) {
-            TodayView()
-                .tabItem { Label("Hoy", systemImage: "sun.max.fill") }
+            DayDetailView()
+                .tabItem { Label("Detalle", systemImage: "sun.max.fill") }
                 .tag(AppSection.hoy)
             PlanView()
                 .tabItem { Label("Plan", systemImage: "calendar") }
@@ -100,7 +100,7 @@ private struct SidebarRootView: View {
             .navigationTitle("Maratón")
         } detail: {
             switch navigator.section {
-            case .hoy:      TodayView()
+            case .hoy:      DayDetailView()
             case .plan:     PlanView()
             case .progreso: ProgressDashboardView()
             }
@@ -115,7 +115,7 @@ struct SectionCommands: Commands {
 
     var body: some Commands {
         CommandMenu("Ir a") {
-            Button("Hoy") { navigator.section = .hoy }
+            Button("Detalle") { navigator.section = .hoy }
                 .keyboardShortcut("1", modifiers: .command)
             Button("Plan") { navigator.section = .plan }
                 .keyboardShortcut("2", modifiers: .command)
