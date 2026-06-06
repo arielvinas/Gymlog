@@ -24,15 +24,29 @@ enum StrengthSeed {
         let rest: Int
         /// Asset con la foto del ejercicio (ej. "r1_07"), o nil si no tiene.
         let imageName: String?
+        /// Si el ejercicio se carga con peso. Los de peso corporal, banda, core,
+        /// equilibrio o salto no llevan peso (no se muestra el campo).
+        let weighted: Bool
 
-        init(name: String, sets: Int, reps: String, note: String?, rest: Int, imageName: String? = nil) {
+        init(name: String, sets: Int, reps: String, note: String?, rest: Int, imageName: String? = nil, weighted: Bool = true) {
             self.name = name
             self.sets = sets
             self.reps = reps
             self.note = note
             self.rest = rest
             self.imageName = imageName
+            self.weighted = weighted
         }
+    }
+
+    /// Nombres de los ejercicios de la rutina que NO llevan peso.
+    static let bodyweightExerciseNames: Set<String> =
+        Set((dayA + dayB).filter { !$0.weighted }.map(\.name))
+
+    /// Indica si un ejercicio lleva peso. Los nombres desconocidos (ejercicios
+    /// cargados a mano por el usuario) se asumen con peso.
+    static func tracksWeight(exerciseName: String) -> Bool {
+        !bodyweightExerciseNames.contains(exerciseName)
     }
 
     // MARK: - DÍA A · Acondicionamiento + específico + fuerza (día 1 del PDF)
@@ -43,18 +57,18 @@ enum StrengthSeed {
     static let dayA: [ExerciseTemplate] = [
         // Acondicionamiento · circuito (3 vueltas)
         ExerciseTemplate(name: "Abdominales bisagra a dos piernas", sets: 3, reps: "12",
-                         note: "Acondicionamiento · circuito (3 vueltas), sin pausa entre ejercicios", rest: 30, imageName: "r1_01"),
+                         note: "Acondicionamiento · circuito (3 vueltas), sin pausa entre ejercicios", rest: 30, imageName: "r1_01", weighted: false),
         ExerciseTemplate(name: "Bicho muerto (dead bug)", sets: 3, reps: "10",
-                         note: "Acondicionamiento · circuito (3 vueltas)", rest: 30, imageName: "r1_02"),
+                         note: "Acondicionamiento · circuito (3 vueltas)", rest: 30, imageName: "r1_02", weighted: false),
         ExerciseTemplate(name: "Nados", sets: 3, reps: "12",
-                         note: "Acondicionamiento · circuito · agarrando disco o banda", rest: 30, imageName: "r1_03"),
+                         note: "Acondicionamiento · circuito · agarrando disco o banda", rest: 30, imageName: "r1_03", weighted: false),
         // Específico · circuito (3 vueltas)
         ExerciseTemplate(name: "Desplazamiento lateral con banda", sets: 3, reps: "16",
-                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r1_04"),
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r1_04", weighted: false),
         ExerciseTemplate(name: "Estocada + flexión de cadera", sets: 3, reps: "16",
-                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r1_05"),
-        ExerciseTemplate(name: "Salto de paracaidista", sets: 3, reps: "16",
-                         note: "Específico · circuito · apoyar la punta del pie al caer", rest: 30, imageName: "r1_06"),
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r1_05", weighted: false),
+        ExerciseTemplate(name: "Salto de paracaidista", sets: 2, reps: "10",
+                         note: "Específico · circuito · apoyar la punta del pie al caer", rest: 30, imageName: "r1_06", weighted: false),
         // Bloque principal de fuerza
         ExerciseTemplate(name: "Tirón dorsal en polea con agarre neutro", sets: 4, reps: "8",
                          note: "Pesado", rest: 90, imageName: "r1_07"),
@@ -63,11 +77,11 @@ enum StrengthSeed {
                          note: "A 1 pierna", rest: 90, imageName: "r1_09"),
         ExerciseTemplate(name: "Bíceps + press Arnold", sets: 4, reps: "12",
                          note: "Desde posición de rodillas", rest: 60, imageName: "r1_10"),
-        ExerciseTemplate(name: "Sentadilla con mancuernas", sets: 4, reps: "5",
-                         note: "Pesado · + 10 sentadillas con salto", rest: 120, imageName: "r1_11"),
+        ExerciseTemplate(name: "Sentadilla con mancuernas", sets: 3, reps: "6-8",
+                         note: "Moderado, sin fallo", rest: 120, imageName: "r1_11"),
         ExerciseTemplate(name: "Bíceps con polea", sets: 3, reps: "10",
                          note: "10+10 en drop set", rest: 45, imageName: "r1_12"),
-        ExerciseTemplate(name: "Fondos de tríceps en banco", sets: 3, reps: "12", note: nil, rest: 60, imageName: "r1_13"),
+        ExerciseTemplate(name: "Fondos de tríceps en banco", sets: 3, reps: "12", note: nil, rest: 60, imageName: "r1_13", weighted: false),
     ]
 
     // MARK: - DÍA B · Acondicionamiento + específico + fuerza (día 2 del PDF)
@@ -77,16 +91,16 @@ enum StrengthSeed {
     static let dayB: [ExerciseTemplate] = [
         // Acondicionamiento · circuito (3 vueltas)
         ExerciseTemplate(name: "Abdominal cruzado", sets: 3, reps: "10",
-                         note: "Acondicionamiento · circuito (3 vueltas), sin pausa entre ejercicios", rest: 30, imageName: "r2_01"),
+                         note: "Acondicionamiento · circuito (3 vueltas), sin pausa entre ejercicios", rest: 30, imageName: "r2_01", weighted: false),
         ExerciseTemplate(name: "Abdominales bicicleta", sets: 3, reps: "20",
-                         note: "Acondicionamiento · circuito (3 vueltas)", rest: 30, imageName: "r2_02"),
+                         note: "Acondicionamiento · circuito (3 vueltas)", rest: 30, imageName: "r2_02", weighted: false),
         ExerciseTemplate(name: "Puente lateral", sets: 3, reps: "30 s",
-                         note: "Acondicionamiento · circuito · mantener la posición", rest: 30, imageName: "r2_03"),
+                         note: "Acondicionamiento · circuito · mantener la posición", rest: 30, imageName: "r2_03", weighted: false),
         // Específico · circuito (3 vueltas)
         ExerciseTemplate(name: "Equilibrio a un pie sobre bosu", sets: 3, reps: "20 s",
-                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r2_04"),
-        ExerciseTemplate(name: "Salto sobre step a una pierna", sets: 3, reps: "10",
-                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r2_05"),
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r2_04", weighted: false),
+        ExerciseTemplate(name: "Salto sobre step a una pierna", sets: 2, reps: "6",
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r2_05", weighted: false),
         ExerciseTemplate(name: "Peso muerto a una pierna con pesa rusa", sets: 3, reps: "10",
                          note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r2_06"),
         // Bloque principal de fuerza
@@ -106,11 +120,28 @@ enum StrengthSeed {
 
     /// Devuelve la rutina que corresponde a un día de fuerza según su título.
     /// "Fuerza liviana" (taper) usa el DÍA B reducido a la mitad y sin pierna.
+    /// En las semanas de pico (15-21/6) y taper (29/6-5/7) se omiten los
+    /// ejercicios de salto (paracaidista / step a una pierna).
     static func templates(for day: WorkoutDay) -> [ExerciseTemplate] {
         let title = day.title.lowercased()
-        if title.contains("liviana") { return taperVariant(of: dayB) }
-        if title.contains("b") { return dayB }
-        return dayA
+        let base: [ExerciseTemplate]
+        if title.contains("liviana") { base = taperVariant(of: dayB) }
+        else if title.contains("b") { base = dayB }
+        else { base = dayA }
+
+        guard omitsJumps(on: day.date) else { return base }
+        return base.filter { !$0.name.localizedCaseInsensitiveContains("salto") }
+    }
+
+    /// Indica si un día cae en una semana sin saltos (pico de volumen o taper).
+    private static func omitsJumps(on date: Date) -> Bool {
+        let cal = PlanConstants.calendar
+        let d = cal.startOfDay(for: date)
+        let picoIni  = cal.startOfDay(for: DateComponents.makeDate(year: 2026, month: 6, day: 15))
+        let picoFin  = cal.startOfDay(for: DateComponents.makeDate(year: 2026, month: 6, day: 21))
+        let taperIni = cal.startOfDay(for: DateComponents.makeDate(year: 2026, month: 6, day: 29))
+        let taperFin = cal.startOfDay(for: DateComponents.makeDate(year: 2026, month: 7, day: 5))
+        return (d >= picoIni && d <= picoFin) || (d >= taperIni && d <= taperFin)
     }
 
     /// Versión de taper: 1-2 series por ejercicio, sin el trabajo de pierna.
@@ -142,7 +173,10 @@ enum StrengthSeed {
     /// v6: corrige los días ≥ 9/6 que en v5 quedaron sin actualizar por tener
     /// datos sueltos cargados (de la rutina vieja). Ahora esos días también se
     /// reemplazan por la rutina nueva, sean cuales sean sus datos previos.
-    static let version = 6
+    /// v7: ajustes de carga (saltos reducidos, sentadilla moderada sin fallo) y
+    /// regla de saltos en pico/taper. Refresca por completo los días de fuerza
+    /// del nuevo plan que aún no tengan nada registrado.
+    static let version = 7
     private static let versionKey = "seededStrengthVersion"
 
     /// Fecha desde la cual rige la rutina nueva del PDF. Los días de fuerza
@@ -189,21 +223,20 @@ enum StrengthSeed {
                 continue
             }
 
-            let routineNames = routine.map(\.name)
-            let currentNames = day.orderedExercises.map(\.name)
+            let hasLogged = day.exercises.contains { $0.hasLoggedData }
 
-            if isNewPlanDay && currentNames != routineNames {
-                // Día del nuevo plan que todavía no está en la rutina nueva: se
-                // reemplaza por completo (la eliminación arrastra sus series) y se
-                // refresca la descripción. Los días ≥ 9/6 son futuros, así que
-                // cualquier dato cargado ahí era de la rutina vieja y ya no aplica.
+            if isNewPlanDay && !hasLogged {
+                // Día del nuevo plan todavía sin nada registrado: se reemplaza por
+                // completo (la eliminación arrastra sus series) y se refresca la
+                // descripción. Así toman los ajustes de carga (saltos reducidos,
+                // sentadilla moderada) y la regla de saltos de pico/taper.
                 for exercise in day.exercises { context.delete(exercise) }
                 insert(routine, into: day, context: context)
                 day.longDescription = WorkoutSeed.longDescription(for: .fuerza, title: day.title)
             } else {
-                // Resto: completa campos faltantes (reps objetivo, descanso,
-                // imagen) sin pisar lo que el usuario editó ni la rutina vieja
-                // de los días anteriores al 9/6 (cuyos nombres no coinciden).
+                // Resto (días con datos cargados o anteriores al 9/6): completa
+                // sólo los campos faltantes sin pisar lo que el usuario editó ni
+                // la rutina vieja.
                 let byName = Dictionary(uniqueKeysWithValues: routine.map { ($0.name, $0) })
                 for exercise in day.exercises {
                     guard let template = byName[exercise.name] else { continue }

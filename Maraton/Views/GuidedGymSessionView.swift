@@ -135,7 +135,7 @@ struct GuidedGymSessionView: View {
 
             HStack(spacing: 16) {
                 if let target = step.exercise.targetReps {
-                    Label("\(target) reps", systemImage: "target")
+                    Label(step.exercise.isTimeBased ? target : "\(target) reps", systemImage: "target")
                 }
                 Label(step.exercise.restOrDefault.restLabel, systemImage: "timer")
             }
@@ -384,36 +384,27 @@ private struct LoggingCard: View {
     var suggestedWeight: Double?
 
     @Environment(\.modelContext) private var context
-    @State private var weightText = ""
-    @State private var repsText = ""
     @State private var lastSession: String?
-    @FocusState private var focused: Field?
-
-    private enum Field { case weight, reps }
 
     var body: some View {
         VStack(spacing: 16) {
-            HStack(spacing: 16) {
-                field(
-                    title: "Peso",
-                    placeholder: "kg",
-                    text: $weightText,
-                    keyboard: .decimalPad,
-                    field: .weight
-                )
-                .onChange(of: weightText) { _, nuevo in
-                    set.weight = Double(nuevo.replacingOccurrences(of: ",", with: "."))
+            HStack(alignment: .top, spacing: 16) {
+                if exercise.tracksWeight {
+                    labeled("Peso") {
+                        WeightWheelField(weight: $set.weight, prominent: true, onCommit: save)
+                    }
                 }
 
-                field(
-                    title: "Reps",
-                    placeholder: exercise.targetReps ?? "reps",
-                    text: $repsText,
-                    keyboard: .numberPad,
-                    field: .reps
-                )
-                .onChange(of: repsText) { _, nuevo in
-                    set.reps = Int(nuevo)
+                labeled(exercise.isTimeBased ? "Tiempo" : "Reps") {
+                    CountWheelField(
+                        count: $set.reps,
+                        unit: exercise.countUnit,
+                        options: ExerciseInput.countOptions(timeBased: exercise.isTimeBased),
+                        defaultValue: ExerciseInput.leadingInt(exercise.targetReps) ?? (exercise.isTimeBased ? 30 : 10),
+                        placeholder: exercise.isTimeBased ? "Tiempo" : "Reps",
+                        prominent: true,
+                        onCommit: save
+                    )
                 }
             }
 
@@ -429,20 +420,10 @@ private struct LoggingCard: View {
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color(.secondarySystemBackground))
         )
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Listo") { focused = nil }
-            }
-        }
         .onAppear {
-            if let w = set.weight {
-                weightText = w.formattedKg
-            } else if let s = suggestedWeight {
-                weightText = s.formattedKg
+            if exercise.tracksWeight, set.weight == nil, let s = suggestedWeight {
                 set.weight = s
             }
-            if let r = set.reps { repsText = "\(r)" }
             lastSession = ExerciseHistory.lastSession(
                 name: exercise.name,
                 before: exercise.dayDate,
@@ -451,30 +432,17 @@ private struct LoggingCard: View {
         }
     }
 
-    private func field(
-        title: String,
-        placeholder: String,
-        text: Binding<String>,
-        keyboard: UIKeyboardType,
-        field: Field
-    ) -> some View {
+    private func labeled<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 6) {
             Text(title)
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            TextField(placeholder, text: text)
-                .keyboardType(keyboard)
-                .focused($focused, equals: field)
-                .multilineTextAlignment(.center)
-                .font(.title2.weight(.semibold))
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(.tertiarySystemFill))
-                )
+            content()
         }
+        .frame(maxWidth: .infinity)
     }
+
+    private func save() { try? context.save() }
 }
 
 // MARK: - Aviso de fin de descanso (sonido + vibración)

@@ -13,14 +13,27 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
   circuito de acondicionamiento + específico (3 vueltas) y sigue con el bloque
   principal de fuerza. Cada ejercicio lleva su **foto** (assets `r1_NN`/`r2_NN`
   en `Maraton/Assets.xcassets`, importadas del PDF/web del plan) vía el campo
-  `Exercise.imageName`. Están en `StrengthSeed`; `populateIfNeeded` (v5) reemplaza
-  la rutina de un día si su plantilla cambió y no tiene nada cargado (respeta lo
-  registrado), **sólo para días de fuerza del 9/6/2026 en adelante** (piso
-  `newPlanCutoff`); los días anteriores conservan lo que tenían. Las fotos se
-  muestran en `GymSessionView` (miniatura, `ExerciseThumbnail`) y en
-  `GuidedGymSessionView` (imagen grande). Migración puntual
-  `WorkoutSeed.applyThursdayGymSwapIfNeeded`: en la semana del 4-5/6/2026 dejó el
-  jueves como gimnasio (Fuerza B) y movió la corrida de calidad al viernes.
+  `Exercise.imageName`. Están en `StrengthSeed`; `populateIfNeeded` (**v7**)
+  refresca por completo la rutina de un día de fuerza del nuevo plan que aún no
+  tenga nada registrado (respeta lo que el usuario cargó), **sólo para días del
+  9/6/2026 en adelante** (piso `newPlanCutoff`); los anteriores conservan lo que
+  tenían. Las fotos se muestran en `GymSessionView` (miniatura, `ExerciseThumbnail`)
+  y en `GuidedGymSessionView` (imagen grande). Cada `ExerciseTemplate` tiene flag
+  `weighted`: los de peso corporal/banda/core/equilibrio/salto no llevan peso
+  (`StrengthSeed.bodyweightExerciseNames` + `Exercise.tracksWeight`). En las
+  semanas de **pico** (15-21/6) y **taper** (29/6-5/7), `templates(for:)` **omite
+  los ejercicios de salto** (paracaidista / step a una pierna). Migraciones
+  puntuales de `WorkoutSeed` (cada una corre 1 vez, con su clave en UserDefaults):
+  `applyThursdayGymSwapIfNeeded` (semana del 4-5/6/2026: jueves a gimnasio Fuerza B,
+  calidad al viernes) y **`applyNewStructureIfNeeded`** (pone los días del **8/6 en
+  adelante** con la estructura/calidades nuevas, sin tocar nada ≤ 7/6; preserva
+  progreso y no cambia tipos).
+- **Carga de series por rueda (estilo alarma), sin teclado:** en `GymSessionView`
+  (`SetRow`) y `GuidedGymSessionView` (`LoggingCard`) el peso/reps/segundos se
+  eligen tocando un chip que abre una hoja con ruedas (`WeightWheelField` —kg +
+  fracción— y `CountWheelField` —reps o segundos según `Exercise.isTimeBased`—,
+  ambos en `GymSessionView.swift`). El campo de **peso se oculta** en ejercicios
+  sin peso (`Exercise.tracksWeight`).
 - Dashboard en 3 tabs: **Detalle** (vista de un día del plan, deslizable entre
   todos los días o saltando desde la tira de la semana; muestra qué toca, datos de
   la semana de ese día, última corrida y suplementos del día —permite marcar

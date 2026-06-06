@@ -120,7 +120,7 @@ private struct ExerciseSection: View {
     var body: some View {
         Section {
             ForEach(exercise.orderedSets) { set in
-                SetRow(set: set, index: set.order, targetReps: exercise.targetReps)
+                SetRow(set: set, index: set.order, exercise: exercise)
             }
             .onDelete(perform: eliminarSeries)
 
@@ -166,7 +166,7 @@ private struct ExerciseSection: View {
             }
 
             if let target = exercise.targetReps {
-                Text("Objetivo: \(target) reps")
+                Text("Objetivo: \(target)\(exercise.isTimeBased ? "" : " reps")")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(WorkoutType.fuerza.color)
                     .textCase(nil)
@@ -227,58 +227,42 @@ private struct ExerciseSection: View {
 private struct SetRow: View {
     @Bindable var set: ExerciseSet
     let index: Int
-    var targetReps: String?
+    let exercise: Exercise
 
     @Environment(\.modelContext) private var context
-    @State private var weightText = ""
-    @State private var repsText = ""
 
     var body: some View {
         HStack(spacing: 12) {
             Text("Serie \(index)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-                .frame(width: 64, alignment: .leading)
+                .frame(width: 56, alignment: .leading)
 
-            field(placeholder: "kg", text: $weightText, keyboard: .decimalPad)
-                .onChange(of: weightText) { _, nuevo in
-                    set.weight = Double(nuevo.replacingOccurrences(of: ",", with: "."))
-                }
-            Text("kg")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if exercise.tracksWeight {
+                WeightWheelField(weight: $set.weight, onCommit: save)
+            }
 
-            field(placeholder: targetReps ?? "reps", text: $repsText, keyboard: .numberPad)
-                .onChange(of: repsText) { _, nuevo in
-                    set.reps = Int(nuevo)
-                }
+            CountWheelField(
+                count: $set.reps,
+                unit: exercise.countUnit,
+                options: ExerciseInput.countOptions(timeBased: exercise.isTimeBased),
+                defaultValue: ExerciseInput.leadingInt(exercise.targetReps) ?? (exercise.isTimeBased ? 30 : 10),
+                placeholder: exercise.isTimeBased ? "Tiempo" : "Reps",
+                onCommit: save
+            )
 
             Button {
                 set.isDone.toggle()
-                try? context.save()
+                save()
             } label: {
                 Image(systemName: set.isDone ? "checkmark.circle.fill" : "circle")
                     .foregroundStyle(set.isDone ? .green : .secondary)
             }
             .buttonStyle(.plain)
         }
-        .onAppear {
-            if let w = set.weight { weightText = w.formattedKg }
-            if let r = set.reps { repsText = "\(r)" }
-        }
     }
 
-    private func field(placeholder: String, text: Binding<String>, keyboard: UIKeyboardType) -> some View {
-        TextField(placeholder, text: text)
-            .keyboardType(keyboard)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.tertiarySystemFill))
-            )
-    }
+    private func save() { try? context.save() }
 }
 
 // MARK: - Miniatura de la foto del ejercicio
@@ -306,6 +290,196 @@ struct ExerciseThumbnail: View {
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// MARK: - Campos de selección por rueda (estilo alarma)
+
+/// Opciones para los selectores de conteo (reps / segundos).
+enum ExerciseInput {
+    static let repOptions = Array(1...50)
+    static let secondOptions = Array(stride(from: 5, through: 180, by: 5))
+
+    static func countOptions(timeBased: Bool) -> [Int] {
+        timeBased ? secondOptions : repOptions
+    }
+
+    /// Primer número de un objetivo (ej. "6-8" → 6, "30 s" → 30).
+    static func leadingInt(_ text: String?) -> Int? {
+        guard let text else { return nil }
+        return Int(text.prefix { $0.isNumber })
+    }
+}
+
+/// Chip que muestra el valor elegido (o un placeholder) con un ícono de rueda.
+private struct WheelChip: View {
+    let text: String?
+    let placeholder: String
+    var prominent: Bool
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(text ?? placeholder)
+                .foregroundStyle(text == nil ? .secondary : .primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .font(prominent ? .title3.weight(.semibold) : .subheadline)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, prominent ? 12 : 8)
+        .background(
+            RoundedRectangle(cornerRadius: prominent ? 12 : 8)
+                .fill(Color(.tertiarySystemFill))
+        )
+        .contentShape(Rectangle())
+    }
+}
+
+/// Campo de peso: muestra el valor y, al tocarlo, abre una hoja con dos ruedas
+/// (kilos enteros y fracción) para elegirlo deslizando, sin teclado.
+struct WeightWheelField: View {
+    @Binding var weight: Double?
+    var prominent = false
+    var onCommit: () -> Void = {}
+
+    @State private var showing = false
+    @State private var whole = 20
+    @State private var fraction = 0.0
+
+    private static let wholeRange = Array(0...250)
+    private static let fractions: [Double] = [0, 0.25, 0.5, 0.75]
+
+    var body: some View {
+        Button {
+            prepare()
+            showing = true
+        } label: {
+            WheelChip(text: weight.map { "\($0.formattedKg) kg" }, placeholder: "Peso", prominent: prominent)
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showing) {
+            NavigationStack {
+                HStack(spacing: 0) {
+                    Picker("kg", selection: $whole) {
+                        ForEach(Self.wholeRange, id: \.self) { Text("\($0)").tag($0) }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(maxWidth: .infinity)
+
+                    Picker("fracción", selection: $fraction) {
+                        ForEach(Self.fractions, id: \.self) { Text(fractionLabel($0)).tag($0) }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(width: 90)
+
+                    Text("kg")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 40)
+                }
+                .padding(.horizontal)
+                .navigationTitle("Peso")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancelar") { showing = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Listo") {
+                            weight = Double(whole) + fraction
+                            onCommit()
+                            showing = false
+                        }
+                        .fontWeight(.semibold)
+                    }
+                }
+            }
+            .presentationDetents([.height(320)])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func prepare() {
+        let value = weight ?? 20
+        whole = min(max(Int(value), 0), Self.wholeRange.last ?? 250)
+        let frac = value - Double(Int(value))
+        fraction = Self.fractions.min(by: { abs($0 - frac) < abs($1 - frac) }) ?? 0
+    }
+
+    private func fractionLabel(_ f: Double) -> String {
+        switch f {
+        case 0.25: return ",25"
+        case 0.5:  return ",50"
+        case 0.75: return ",75"
+        default:   return ",00"
+        }
+    }
+}
+
+/// Campo de conteo (reps o segundos): muestra el valor y abre una hoja con una
+/// rueda para elegirlo deslizando, sin teclado.
+struct CountWheelField: View {
+    @Binding var count: Int?
+    var unit: String = "reps"
+    var options: [Int] = ExerciseInput.repOptions
+    var defaultValue: Int = 10
+    var placeholder: String = "Reps"
+    var prominent = false
+    var onCommit: () -> Void = {}
+
+    @State private var showing = false
+    @State private var draft = 0
+
+    var body: some View {
+        Button {
+            draft = count ?? clampedDefault()
+            showing = true
+        } label: {
+            WheelChip(text: count.map { "\($0) \(unit)" }, placeholder: placeholder, prominent: prominent)
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showing) {
+            NavigationStack {
+                HStack(spacing: 0) {
+                    Picker(unit, selection: $draft) {
+                        ForEach(options, id: \.self) { Text("\($0)").tag($0) }
+                    }
+                    .pickerStyle(.wheel)
+                    .frame(maxWidth: .infinity)
+
+                    Text(unit)
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 60)
+                }
+                .padding(.horizontal)
+                .navigationTitle(unit == "seg" ? "Segundos" : "Repeticiones")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancelar") { showing = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Listo") {
+                            count = draft
+                            onCommit()
+                            showing = false
+                        }
+                        .fontWeight(.semibold)
+                    }
+                }
+            }
+            .presentationDetents([.height(320)])
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func clampedDefault() -> Int {
+        if options.contains(defaultValue) { return defaultValue }
+        return options.min(by: { abs($0 - defaultValue) < abs($1 - defaultValue) }) ?? options.first ?? 0
     }
 }
 

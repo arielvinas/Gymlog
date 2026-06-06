@@ -103,36 +103,36 @@ enum WorkoutSeed {
         ]),
         Week(title: "Semana 2", tag: nil, entries: [
             Entry(year: 2026, month: 6, day: 8, title: "Descanso / movilidad", detail: "", type: .descanso),
-            Entry(year: 2026, month: 6, day: 9, title: "Fuerza A", detail: "", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 9, title: "Fuerza A", detail: "Día 1", type: .fuerza),
             Entry(year: 2026, month: 6, day: 10, title: "Rodaje suave 6 km", detail: "Z2", type: .rodaje),
-            Entry(year: 2026, month: 6, day: 11, title: "Calidad · 2×10' tempo", detail: "3' trote", type: .calidad),
-            Entry(year: 2026, month: 6, day: 12, title: "Fuerza B", detail: "", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 11, title: "Calidad · 5×3' a ritmo controlado", detail: "(5:30-5:45/km), 90\" trote", type: .calidad),
+            Entry(year: 2026, month: 6, day: 12, title: "Fuerza B", detail: "Día 2", type: .fuerza),
             Entry(year: 2026, month: 6, day: 13, title: "Descanso", detail: "", type: .descanso),
             Entry(year: 2026, month: 6, day: 14, title: "Fondo largo 16 km", detail: "Practicá geles", type: .fondo),
         ]),
         Week(title: "Semana 3", tag: "Pico de volumen", entries: [
             Entry(year: 2026, month: 6, day: 15, title: "Descanso / movilidad", detail: "", type: .descanso),
-            Entry(year: 2026, month: 6, day: 16, title: "Fuerza A", detail: "", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 16, title: "Fuerza A", detail: "Día 1 · sin saltos", type: .fuerza),
             Entry(year: 2026, month: 6, day: 17, title: "Rodaje suave 6 km", detail: "Z2", type: .rodaje),
-            Entry(year: 2026, month: 6, day: 18, title: "Calidad · 25-30' continuos tempo", detail: "", type: .calidad),
-            Entry(year: 2026, month: 6, day: 19, title: "Fuerza B", detail: "", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 18, title: "Calidad · 4×4' a ritmo controlado", detail: "90\" trote", type: .calidad),
+            Entry(year: 2026, month: 6, day: 19, title: "Fuerza B", detail: "Día 2 · sin saltos", type: .fuerza),
             Entry(year: 2026, month: 6, day: 20, title: "Descanso", detail: "", type: .descanso),
-            Entry(year: 2026, month: 6, day: 21, title: "Fondo largo 18 km", detail: "Tope · geles", type: .fondo),
+            Entry(year: 2026, month: 6, day: 21, title: "Fondo largo 18 km", detail: "Tope de volumen · geles", type: .fondo),
         ]),
         Week(title: "Semana 4", tag: nil, entries: [
             Entry(year: 2026, month: 6, day: 22, title: "Descanso / movilidad", detail: "", type: .descanso),
-            Entry(year: 2026, month: 6, day: 23, title: "Fuerza A", detail: "", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 23, title: "Fuerza A", detail: "Día 1", type: .fuerza),
             Entry(year: 2026, month: 6, day: 24, title: "Rodaje suave 6 km", detail: "Z2", type: .rodaje),
-            Entry(year: 2026, month: 6, day: 25, title: "Calidad · 25-30' continuos tempo", detail: "", type: .calidad),
-            Entry(year: 2026, month: 6, day: 26, title: "Fuerza B", detail: "", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 25, title: "Calidad · 2×8' o 20' continuos", detail: "Tempo controlado", type: .calidad),
+            Entry(year: 2026, month: 6, day: 26, title: "Fuerza B", detail: "Día 2", type: .fuerza),
             Entry(year: 2026, month: 6, day: 27, title: "Descanso", detail: "", type: .descanso),
             Entry(year: 2026, month: 6, day: 28, title: "Fondo 13-14 km", detail: "Arranca el taper", type: .fondo),
         ]),
         Week(title: "Semana 5", tag: "Taper", entries: [
             Entry(year: 2026, month: 6, day: 29, title: "Descanso / movilidad", detail: "", type: .descanso),
-            Entry(year: 2026, month: 6, day: 30, title: "Fuerza liviana", detail: "Mitad de series, sin pierna pesada", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 30, title: "Fuerza liviana", detail: "Mitad de series, sin saltos, sin pierna pesada", type: .fuerza),
             Entry(year: 2026, month: 7, day: 1, title: "Rodaje suave 4-5 km", detail: "Z2", type: .rodaje),
-            Entry(year: 2026, month: 7, day: 2, title: "Tempo cortito 15'", detail: "", type: .calidad),
+            Entry(year: 2026, month: 7, day: 2, title: "Tempo corto 10-15'", detail: "", type: .calidad),
             Entry(year: 2026, month: 7, day: 3, title: "Descanso o trote muy corto 10'", detail: "", type: .descanso),
             Entry(year: 2026, month: 7, day: 4, title: "Descanso total", detail: "Hidratar + cargar hidratos", type: .descanso),
             Entry(year: 2026, month: 7, day: 5, title: "Media Maratón Córdoba", detail: "21,1 km", type: .carrera),
@@ -286,5 +286,61 @@ enum WorkoutSeed {
 
         try? context.save()
         markThursdaySwapApplied()
+    }
+
+    // MARK: - Estructura nueva del 8/6 en adelante
+
+    private static let newStructureKey = "appliedNewStructureV1"
+
+    /// Primer día que toca la actualización de estructura. Todo lo igual o
+    /// anterior al 7/6 queda intacto.
+    private static let newStructureCutoff = DateComponents.makeDate(year: 2026, month: 6, day: 8)
+
+    private static var newStructureApplied: Bool {
+        let local = UserDefaults.standard.bool(forKey: newStructureKey)
+        guard AppData.iCloudSyncEnabled else { return local }
+        return local || NSUbiquitousKeyValueStore.default.bool(forKey: newStructureKey)
+    }
+
+    private static func markNewStructureApplied() {
+        UserDefaults.standard.set(true, forKey: newStructureKey)
+        if AppData.iCloudSyncEnabled {
+            NSUbiquitousKeyValueStore.default.set(true, forKey: newStructureKey)
+            NSUbiquitousKeyValueStore.default.synchronize()
+        }
+    }
+
+    /// Pone los días del 8/6 en adelante al día con la estructura canónica nueva
+    /// (calidades con su prescripción, notas de fondo, semana de pico/taper). No
+    /// toca ninguna fecha igual o anterior al 7/6. Corre una sola vez. Como esos
+    /// días son futuros, reescribe los campos descriptivos; preserva el progreso
+    /// (`isCompleted`, métricas y ejercicios) y no cambia el tipo de ningún día.
+    static func applyNewStructureIfNeeded(context: ModelContext) {
+        guard !newStructureApplied else { return }
+
+        let cal = PlanConstants.calendar
+        let cutoff = cal.startOfDay(for: newStructureCutoff)
+
+        guard let existentes = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
+        let porFecha = Dictionary(existentes.map { (cal.startOfDay(for: $0.date), $0) },
+                                  uniquingKeysWith: { a, _ in a })
+
+        for canonical in allWorkoutDays() where cal.startOfDay(for: canonical.date) >= cutoff {
+            let key = cal.startOfDay(for: canonical.date)
+            if let dia = porFecha[key] {
+                dia.title = canonical.title
+                dia.detail = canonical.detail
+                dia.longDescription = canonical.longDescription
+                dia.type = canonical.type
+                dia.weekTitle = canonical.weekTitle
+                dia.weekTag = canonical.weekTag
+                dia.weekOrder = canonical.weekOrder
+            } else {
+                context.insert(canonical)
+            }
+        }
+
+        try? context.save()
+        markNewStructureApplied()
     }
 }

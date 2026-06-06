@@ -56,6 +56,7 @@ enum AppData {
         WorkoutSeed.seedIfNeeded(context: context)
         WorkoutSeed.applyPlanUpdates(context: context)
         WorkoutSeed.applyThursdayGymSwapIfNeeded(context: context)
+        WorkoutSeed.applyNewStructureIfNeeded(context: context)
         StrengthSeed.populateIfNeeded(context: context)
     }
 }

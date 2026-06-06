@@ -77,4 +77,19 @@ final class Exercise {
     var hasLoggedData: Bool {
         sets.contains { $0.reps != nil || $0.weight != nil }
     }
+
+    /// Si el ejercicio se carga con peso. Los de peso corporal, banda, core,
+    /// equilibrio o salto no lo llevan (no se muestra el campo de peso).
+    var tracksWeight: Bool {
+        StrengthSeed.tracksWeight(exerciseName: name)
+    }
+
+    /// El objetivo está expresado en tiempo (ej. "30 s") en lugar de reps.
+    var isTimeBased: Bool {
+        guard let targetReps else { return false }
+        return targetReps.localizedCaseInsensitiveContains("s")
+    }
+
+    /// Unidad del campo de conteo: segundos o repeticiones.
+    var countUnit: String { isTimeBased ? "seg" : "reps" }
 }
