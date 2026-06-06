@@ -8,12 +8,28 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
 - Plan de entrenamiento con seed + reconciliación versionada.
 - Seguimiento de corridas con importación desde Apple Health (HealthKit).
 - Rutina de gimnasio (ejercicios/series/peso) + importación de métricas de
-  sesiones de fuerza desde Health.
-- Dashboard en 3 tabs: **Hoy** (qué hago hoy + suplementos),
-  **Plan** (editable: crear/editar/borrar días), **Progreso** (consistencia,
-  proyección, evolución de fuerza, suplementos).
+  sesiones de fuerza desde Health. Plantillas Fuerza A (empuje+pierna+core) y
+  Fuerza B (espalda+tríceps+core, con bloque de zona media en circuito) en
+  `StrengthSeed`; `populateIfNeeded` reemplaza la rutina de un día si su plantilla
+  cambió y todavía no tiene nada cargado (respeta lo registrado). Migración puntual
+  `WorkoutSeed.applyThursdayGymSwapIfNeeded`: en la semana del 4-5/6/2026 dejó el
+  jueves como gimnasio (Fuerza B) y movió la corrida de calidad al viernes.
+- Dashboard en 3 tabs: **Detalle** (vista de un día del plan, deslizable entre
+  todos los días o saltando desde la tira de la semana; muestra qué toca, datos de
+  la semana de ese día, última corrida y suplementos del día —permite marcar
+  suplementos de días pasados—), **Plan** (editable: crear/editar/borrar días),
+  **Progreso** (consistencia, proyección, evolución de fuerza, suplementos +
+  **generar reporte PDF**).
 - Suplementos (creatina, proteína): marcado diario, adherencia, rachas y
   recordatorios locales configurables.
+- **Reporte de progreso (PDF) para el profe:** botón en Progreso que junta
+  adherencia al plan, corridas (km, ritmo, proyección, últimas corridas), fuerza
+  (sesiones + mejores series), suplementos, y métricas de **Apple Salud / Fitness**
+  (FC en reposo, HRV, VO₂máx, peso, sueño y resumen de entrenamientos), y lo
+  comparte como PDF. Render con `ReportView` + `ImageRenderer`→PDF; se comparte vía
+  `ShareLink` con un `Transferable` de tipo `.pdf` (`ReportPDFFile`) y miniatura
+  de la 1ª página (PDFKit). Los datos se arman en `ProgressReportBuilder`
+  (`ProgressReport.swift`) y las métricas de Salud en `HealthManager.snapshot(from:to:)`.
 
 - **Versión Mac (Mac Catalyst):** mismo target. Barra lateral
   (`NavigationSplitView`), ventana redimensionable, menú "Ir a" con atajos
@@ -31,10 +47,14 @@ Tres carpetas = tres grupos sincronizados:
   usuario confirma la próxima serie con `skipRest`) y `AppData` (schema,
   creación del `ModelContainer` y sembrado; dueño del flag `iCloudSyncEnabled`).
 - `Maraton/` — app iOS/Catalyst (solo target Maraton). `Maraton/Views/` (`RootView`,
-  `TodayView`, `PlanView`, `WorkoutDetailView`, `WorkoutEditView`, `GymSessionView`,
-  `GuidedGymSessionView`, etc.), `MaratonApp`, y helpers iOS (`HealthManager`,
-  `NotificationManager`, `RaceProjection`, `StreakCalculator`, `StrengthProgress`,
-  `SupplementTracker`, `WeekAssigner`, `PreviewData`).
+  `DayDetailView` —tab "Detalle": carrusel `TabView`(.page) de todos los días del plan—,
+  `WeekStripView` —tira de la semana del día seleccionado, salta al tocar—, `PlanView`,
+  `WorkoutDetailView`, `WorkoutEditView`, `GymSessionView`, `GuidedGymSessionView`,
+  `SupplementsTodayCard` —acepta una fecha, no solo hoy—, `ReportView` —documento +
+  generación de PDF + hoja de compartir—, etc.), `MaratonApp`, y helpers iOS
+  (`HealthManager`, `NotificationManager`, `RaceProjection`, `StreakCalculator`,
+  `StrengthProgress`, `SupplementTracker`, `ProgressReport` —modelo + constructor del
+  reporte—, `WeekAssigner`, `PreviewData`).
 - `MaratonWatch Watch App/` — app del reloj (solo target watchOS). `MaratonWatchApp`,
   `WatchTodayView` (carrusel deslizable de días del plan que arranca en hoy: qué toca
   + suplementos por día, reutiliza `DailyPlanInfo`/`SupplementTracker`), `WatchWorkoutView`
@@ -52,8 +72,9 @@ Tres carpetas = tres grupos sincronizados:
   `membershipExceptions` (si no, choca con `INFOPLIST_FILE`).
 
 ## Build / deploy (CLI)
-- **iPhone físico:** "iPhone de Ariel", iPhone 15 Pro, UDID
-  `<UDID-IPHONE>`.
+- **iPhone físico:** "iPhone de Ariel", iPhone 15 Pro, UDID hardware
+  `<UDID-IPHONE>` (id CoreDevice `<COREDEVICE-ID-IPHONE>`,
+  el que toma `devicectl`/`-destination 'id=…'`).
   ```sh
   xcodebuild -project Maraton.xcodeproj -scheme Maraton \
     -destination 'platform=iOS,name=iPhone de Ariel' -configuration Debug \

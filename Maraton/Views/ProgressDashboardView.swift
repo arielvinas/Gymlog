@@ -11,6 +11,9 @@ import SwiftData
 struct ProgressDashboardView: View {
     @Query private var days: [WorkoutDay]
     @Query private var exercises: [Exercise]
+    @Query private var supplementLogs: [SupplementLog]
+
+    @State private var showingReport = false
 
     private var daysToRace: Int { PlanConstants.daysUntilRace() }
 
@@ -70,6 +73,18 @@ struct ProgressDashboardView: View {
             }
             .navigationTitle("Progreso")
             .background(Color(.systemGroupedBackground))
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        showingReport = true
+                    } label: {
+                        Label("Reporte", systemImage: "doc.text.fill")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingReport) {
+                ReportSheet(days: days, exercises: exercises, logs: supplementLogs)
+            }
         }
     }
 
