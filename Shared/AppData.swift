@@ -55,6 +55,7 @@ enum AppData {
     static func seed(context: ModelContext) {
         WorkoutSeed.seedIfNeeded(context: context)
         WorkoutSeed.applyPlanUpdates(context: context)
+        WorkoutSeed.applyThursdayGymSwapIfNeeded(context: context)
         StrengthSeed.populateIfNeeded(context: context)
     }
 }

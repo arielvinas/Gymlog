@@ -33,7 +33,9 @@ enum WorkoutSeed {
     """
 
     private static let descFuerzaB = """
-    Tirón (remo, dorsales, pull over), bíceps, core.
+    Espalda y tríceps con foco en zona media. Arrancá con el circuito de zona \
+    media (3 vueltas seguidas, sin pausa entre ejercicios) y seguí con el bloque \
+    principal de tirón y tríceps. Dejá 1-2 reps en reserva.
     """
 
     private static let descDescanso = """
@@ -93,8 +95,8 @@ enum WorkoutSeed {
             Entry(year: 2026, month: 6, day: 1, title: "Descanso / movilidad", detail: "", type: .descanso),
             Entry(year: 2026, month: 6, day: 2, title: "Fuerza A", detail: "Empuje + pierna + core", type: .fuerza),
             Entry(year: 2026, month: 6, day: 3, title: "Rodaje suave 5 km", detail: "Z2", type: .rodaje),
-            Entry(year: 2026, month: 6, day: 4, title: "Calidad · 2×10' tempo", detail: "(7/10), 3' trote", type: .calidad),
-            Entry(year: 2026, month: 6, day: 5, title: "Fuerza B", detail: "Tirón + core", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 4, title: "Fuerza B", detail: "Espalda + tríceps + core", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 5, title: "Calidad · 2×10' tempo", detail: "(7/10), 3' trote", type: .calidad),
             Entry(year: 2026, month: 6, day: 6, title: "Descanso", detail: "(o trote 15')", type: .descanso),
             Entry(year: 2026, month: 6, day: 7, title: "Fondo largo 14 km", detail: "", type: .fondo),
         ]),
@@ -219,5 +221,69 @@ enum WorkoutSeed {
         }
 
         markSeeded(planVersion)
+    }
+
+    // MARK: - Ajuste puntual semana 1 (jueves gimnasio / viernes calidad)
+
+    private static let thursdaySwapKey = "appliedThursdayGymSwapV1"
+
+    private static var thursdaySwapApplied: Bool {
+        let local = UserDefaults.standard.bool(forKey: thursdaySwapKey)
+        guard AppData.iCloudSyncEnabled else { return local }
+        return local || NSUbiquitousKeyValueStore.default.bool(forKey: thursdaySwapKey)
+    }
+
+    private static func markThursdaySwapApplied() {
+        UserDefaults.standard.set(true, forKey: thursdaySwapKey)
+        if AppData.iCloudSyncEnabled {
+            NSUbiquitousKeyValueStore.default.set(true, forKey: thursdaySwapKey)
+            NSUbiquitousKeyValueStore.default.synchronize()
+        }
+    }
+
+    /// Intercambia el jueves 4/6 y el viernes 5/6 en instalaciones ya sembradas:
+    /// el jueves pasa a ser el día de fuerza (gimnasio, nueva rutina de Fuerza B)
+    /// y la corrida de calidad se mueve al viernes. Los ejercicios del jueves los
+    /// siembra después `StrengthSeed.populateIfNeeded`. Corre una sola vez y sólo
+    /// si los días siguen como los dejó el plan original (no pisa ediciones).
+    static func applyThursdayGymSwapIfNeeded(context: ModelContext) {
+        guard !thursdaySwapApplied else { return }
+
+        let cal = PlanConstants.calendar
+        let jueves = DateComponents.makeDate(year: 2026, month: 6, day: 4)
+        let viernes = DateComponents.makeDate(year: 2026, month: 6, day: 5)
+
+        guard let days = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
+
+        // Jueves: de corrida de calidad a día de fuerza (gimnasio).
+        if let thu = days.first(where: { cal.isDate($0.date, inSameDayAs: jueves) }), thu.type == .calidad {
+            thu.type = .fuerza
+            thu.title = "Fuerza B"
+            thu.detail = "Espalda + tríceps + core"
+            thu.longDescription = longDescription(for: .fuerza, title: thu.title)
+            thu.isCompleted = false
+            // Limpia campos de corrida que ya no aplican.
+            thu.actualKm = nil
+            thu.durationMinutes = nil
+            thu.perceivedEffort = nil
+            thu.avgHeartRate = nil
+            thu.activeCalories = nil
+        }
+
+        // Viernes: de día de fuerza a corrida de calidad. Si no hay nada
+        // registrado en el gimnasio, se quitan los ejercicios sobrantes.
+        if let fri = days.first(where: { cal.isDate($0.date, inSameDayAs: viernes) }), fri.type == .fuerza {
+            if !fri.exercises.contains(where: { $0.hasLoggedData }) {
+                for exercise in fri.exercises { context.delete(exercise) }
+            }
+            fri.type = .calidad
+            fri.title = "Calidad · 2×10' tempo"
+            fri.detail = "(7/10), 3' trote"
+            fri.longDescription = longDescription(for: .calidad, title: fri.title)
+            fri.isCompleted = false
+        }
+
+        try? context.save()
+        markThursdaySwapApplied()
     }
 }
