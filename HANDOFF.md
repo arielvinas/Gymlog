@@ -42,6 +42,13 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
   **generar reporte PDF**).
 - Suplementos (creatina, proteína): marcado diario, adherencia, rachas y
   recordatorios locales configurables.
+- **Exportar el plan a PDF (para compartir con amigos):** botón de compartir en
+  la tab **Plan** (`PlanView`, arriba a la izquierda) que abre `PlanExportSheet`.
+  Arma un PDF con el plan completo semana por semana (encabezado de la carrera +
+  cada día con ícono/color por tipo, título y detalle). Misma maquinaria que el
+  reporte: `PlanExportView` + `ImageRenderer`→PDF (`PlanPDF`, página continua) y
+  `ShareLink` con un `Transferable` `.pdf` (`PlanPDFFile`) + miniatura PDFKit.
+  Todo en `Maraton/Views/PlanExportView.swift`.
 - **Reporte de progreso (PDF) para el profe:** botón en Progreso que junta
   adherencia al plan, corridas (km, ritmo, proyección, últimas corridas), fuerza
   (sesiones + mejores series), suplementos, y métricas de **Apple Salud / Fitness**

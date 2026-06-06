@@ -14,6 +14,7 @@ struct PlanView: View {
 
     @State private var showingNew = false
     @State private var editingDay: WorkoutDay?
+    @State private var showingExport = false
 
     /// Días agrupados por semana, ordenados por la fecha de su primer día.
     private var weeks: [(title: String, tag: String?, days: [WorkoutDay])] {
@@ -66,12 +67,23 @@ struct PlanView: View {
                         Label("Agregar día", systemImage: "plus")
                     }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingExport = true
+                    } label: {
+                        Label("Compartir plan", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(days.isEmpty)
+                }
             }
             .sheet(isPresented: $showingNew) {
                 WorkoutEditView(editing: nil)
             }
             .sheet(item: $editingDay) { day in
                 WorkoutEditView(editing: day)
+            }
+            .sheet(isPresented: $showingExport) {
+                PlanExportSheet(days: days)
             }
         }
     }
