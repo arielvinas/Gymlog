@@ -3,8 +3,8 @@
 //  Maraton
 //
 //  Carga la rutina de fuerza (DÍA A / DÍA B) en los días de fuerza del plan.
-//  Tomada del plan "Fuerza · Media Maratón". Los rangos de repeticiones van en
-//  las notas; el peso lo registra el usuario en cada sesión.
+//  Tomada del plan de Megatlón (entrenador Francisco Ambrosio). Cada ejercicio
+//  lleva su foto (asset `r1_NN` / `r2_NN`); el peso lo registra el usuario.
 //
 
 import Foundation
@@ -22,50 +22,86 @@ enum StrengthSeed {
         let reps: String
         let note: String?
         let rest: Int
+        /// Asset con la foto del ejercicio (ej. "r1_07"), o nil si no tiene.
+        let imageName: String?
+
+        init(name: String, sets: Int, reps: String, note: String?, rest: Int, imageName: String? = nil) {
+            self.name = name
+            self.sets = sets
+            self.reps = reps
+            self.note = note
+            self.rest = rest
+            self.imageName = imageName
+        }
     }
 
-    // MARK: - DÍA A · Empuje + pierna + core (martes)
+    // MARK: - DÍA A · Acondicionamiento + específico + fuerza (día 1 del PDF)
 
+    /// Arranca con dos circuitos de 3 vueltas (acondicionamiento y específico,
+    /// sin pausa entre ejercicios) y sigue con el bloque principal de fuerza.
+    /// El orden de la lista define el orden en la sesión.
     static let dayA: [ExerciseTemplate] = [
-        ExerciseTemplate(name: "Empuje de pecho con barra en banco plano", sets: 3, reps: "6-8",
-                         note: "El fuerte del día · carga exigente", rest: 120),
-        ExerciseTemplate(name: "Empuje de hombros en Hammer", sets: 3, reps: "8-10", note: nil, rest: 90),
-        ExerciseTemplate(name: "Apertura de pecho con mancuernas en banco inclinado", sets: 2, reps: "12-15",
-                         note: "Accesorio · moderado", rest: 60),
-        ExerciseTemplate(name: "Vuelos laterales con mancuernas", sets: 3, reps: "12-15", note: nil, rest: 45),
-        ExerciseTemplate(name: "Tríceps en polea (agarre prono) o press francés", sets: 3, reps: "10-12", note: nil, rest: 60),
-        ExerciseTemplate(name: "Sentadilla copa", sets: 3, reps: "8-10",
-                         note: "Mantenimiento · sin fallo · cuidá las piernas", rest: 90),
-        ExerciseTemplate(name: "Hip thrust con barra", sets: 3, reps: "10-12",
-                         note: "Glúteo · te protege como corredor", rest: 90),
-        ExerciseTemplate(name: "Core", sets: 0, reps: "",
-                         note: "Bicho muerto 3×10 por lado · Plancha prona alta 3×30 s", rest: 45),
+        // Acondicionamiento · circuito (3 vueltas)
+        ExerciseTemplate(name: "Abdominales bisagra a dos piernas", sets: 3, reps: "12",
+                         note: "Acondicionamiento · circuito (3 vueltas), sin pausa entre ejercicios", rest: 30, imageName: "r1_01"),
+        ExerciseTemplate(name: "Bicho muerto (dead bug)", sets: 3, reps: "10",
+                         note: "Acondicionamiento · circuito (3 vueltas)", rest: 30, imageName: "r1_02"),
+        ExerciseTemplate(name: "Nados", sets: 3, reps: "12",
+                         note: "Acondicionamiento · circuito · agarrando disco o banda", rest: 30, imageName: "r1_03"),
+        // Específico · circuito (3 vueltas)
+        ExerciseTemplate(name: "Desplazamiento lateral con banda", sets: 3, reps: "16",
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r1_04"),
+        ExerciseTemplate(name: "Estocada + flexión de cadera", sets: 3, reps: "16",
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r1_05"),
+        ExerciseTemplate(name: "Salto de paracaidista", sets: 3, reps: "16",
+                         note: "Específico · circuito · apoyar la punta del pie al caer", rest: 30, imageName: "r1_06"),
+        // Bloque principal de fuerza
+        ExerciseTemplate(name: "Tirón dorsal en polea con agarre neutro", sets: 4, reps: "8",
+                         note: "Pesado", rest: 90, imageName: "r1_07"),
+        ExerciseTemplate(name: "Buenos días con barra", sets: 4, reps: "12", note: nil, rest: 75, imageName: "r1_08"),
+        ExerciseTemplate(name: "Empuje de piernas (prensa)", sets: 3, reps: "10",
+                         note: "A 1 pierna", rest: 90, imageName: "r1_09"),
+        ExerciseTemplate(name: "Bíceps + press Arnold", sets: 4, reps: "12",
+                         note: "Desde posición de rodillas", rest: 60, imageName: "r1_10"),
+        ExerciseTemplate(name: "Sentadilla con mancuernas", sets: 4, reps: "5",
+                         note: "Pesado · + 10 sentadillas con salto", rest: 120, imageName: "r1_11"),
+        ExerciseTemplate(name: "Bíceps con polea", sets: 3, reps: "10",
+                         note: "10+10 en drop set", rest: 45, imageName: "r1_12"),
+        ExerciseTemplate(name: "Fondos de tríceps en banco", sets: 3, reps: "12", note: nil, rest: 60, imageName: "r1_13"),
     ]
 
-    // MARK: - DÍA B · Espalda + tríceps + core
+    // MARK: - DÍA B · Acondicionamiento + específico + fuerza (día 2 del PDF)
 
-    /// Primero el bloque de Zona media (en circuito: 3 vueltas seguidas, sin
-    /// pausa entre ejercicios, ~30-45 s al terminar cada vuelta) y después el
-    /// bloque Principal. El orden de la lista define el orden en la sesión.
+    /// Mismo esquema que el día A: dos circuitos de 3 vueltas y después el bloque
+    /// principal. El orden de la lista define el orden en la sesión.
     static let dayB: [ExerciseTemplate] = [
-        // Zona media · circuito (3 vueltas)
-        ExerciseTemplate(name: "Abdominales inferiores + vela en banco", sets: 3, reps: "10",
-                         note: "Zona media · circuito (3 vueltas), sin pausa entre ejercicios; ~30-45 s al terminar la vuelta", rest: 30),
-        ExerciseTemplate(name: "Cobras sobre fitball", sets: 3, reps: "10",
-                         note: "Zona media · circuito · con mancuernas", rest: 30),
-        ExerciseTemplate(name: "Puente prono dinámico", sets: 3, reps: "10",
-                         note: "Zona media · circuito · subir-bajar manos a step o rueda abdominal", rest: 30),
-        // Principal
-        ExerciseTemplate(name: "Remo colgado en barra agarre prono", sets: 4, reps: "12-12-12-12",
-                         note: "Aumentar reps cada semana", rest: 75),
-        ExerciseTemplate(name: "Tirón dorsal en polea con agarre supino", sets: 4, reps: "12-10-8-8", note: nil, rest: 90),
-        ExerciseTemplate(name: "Remo con barra en landmine", sets: 4, reps: "15-12-10-10", note: nil, rest: 90),
-        ExerciseTemplate(name: "Pull over con mancuerna", sets: 3, reps: "10-10-10",
-                         note: "Combinar con remo con banda", rest: 60),
-        ExerciseTemplate(name: "Remo con banda", sets: 3, reps: "20-20-20", note: nil, rest: 45),
-        ExerciseTemplate(name: "Tríceps copa", sets: 4, reps: "12-12-10-10", note: nil, rest: 75),
-        ExerciseTemplate(name: "Empuje de pecho con barra en banco plano (toma cerrada)", sets: 3, reps: "10-10-10", note: nil, rest: 90),
-        ExerciseTemplate(name: "Fondos de tríceps en banco", sets: 3, reps: "al fallo", note: nil, rest: 60),
+        // Acondicionamiento · circuito (3 vueltas)
+        ExerciseTemplate(name: "Abdominal cruzado", sets: 3, reps: "10",
+                         note: "Acondicionamiento · circuito (3 vueltas), sin pausa entre ejercicios", rest: 30, imageName: "r2_01"),
+        ExerciseTemplate(name: "Abdominales bicicleta", sets: 3, reps: "20",
+                         note: "Acondicionamiento · circuito (3 vueltas)", rest: 30, imageName: "r2_02"),
+        ExerciseTemplate(name: "Puente lateral", sets: 3, reps: "30 s",
+                         note: "Acondicionamiento · circuito · mantener la posición", rest: 30, imageName: "r2_03"),
+        // Específico · circuito (3 vueltas)
+        ExerciseTemplate(name: "Equilibrio a un pie sobre bosu", sets: 3, reps: "20 s",
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r2_04"),
+        ExerciseTemplate(name: "Salto sobre step a una pierna", sets: 3, reps: "10",
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r2_05"),
+        ExerciseTemplate(name: "Peso muerto a una pierna con pesa rusa", sets: 3, reps: "10",
+                         note: "Específico · circuito (3 vueltas)", rest: 30, imageName: "r2_06"),
+        // Bloque principal de fuerza
+        ExerciseTemplate(name: "Empuje de hombros con barra (parado)", sets: 4, reps: "6", note: nil, rest: 90, imageName: "r2_07"),
+        ExerciseTemplate(name: "Apertura de pecho con mancuernas en banco inclinado", sets: 4, reps: "12", note: nil, rest: 60, imageName: "r2_08"),
+        ExerciseTemplate(name: "Aductores en máquina", sets: 4, reps: "12", note: nil, rest: 60, imageName: "r2_09"),
+        ExerciseTemplate(name: "Apertura de pecho en máquina", sets: 3, reps: "15", note: nil, rest: 45, imageName: "r2_10"),
+        ExerciseTemplate(name: "Extensión de rodillas en máquina", sets: 4, reps: "12",
+                         note: "Unilateral · 2\" de pausa arriba", rest: 60, imageName: "r2_11"),
+        ExerciseTemplate(name: "Remo con mancuerna a un brazo", sets: 3, reps: "12", note: nil, rest: 60, imageName: "r2_12"),
+        ExerciseTemplate(name: "Flexión de rodillas acostado", sets: 3, reps: "5",
+                         note: "Unilateral", rest: 60, imageName: "r2_13"),
+        ExerciseTemplate(name: "Bíceps con barra toma supina", sets: 3, reps: "10",
+                         note: "Micro pausa entre series", rest: 30, imageName: "r2_14"),
+        ExerciseTemplate(name: "Tríceps con polea 2", sets: 3, reps: "12", note: nil, rest: 45, imageName: "r2_15"),
     ]
 
     /// Devuelve la rutina que corresponde a un día de fuerza según su título.
@@ -84,7 +120,7 @@ enum StrengthSeed {
             .map { t in
                 let reducedSets = t.sets == 0 ? 0 : max(1, (t.sets + 1) / 2)
                 let note = t.sets == 0 ? t.note : "Taper · mitad de series, carga cómoda"
-                return ExerciseTemplate(name: t.name, sets: reducedSets, reps: t.reps, note: note, rest: t.rest)
+                return ExerciseTemplate(name: t.name, sets: reducedSets, reps: t.reps, note: note, rest: t.rest, imageName: t.imageName)
             }
     }
 
@@ -100,8 +136,18 @@ enum StrengthSeed {
     /// completándolo también en los ejercicios ya sembrados.
     /// v4: nueva rutina de Fuerza B (Espalda + tríceps + core). Se reemplaza la
     /// rutina de los días cuyo template cambió y que aún no tienen nada cargado.
-    static let version = 4
+    /// v5: rutinas nuevas del plan de Megatlón (con fotos por ejercicio). Sólo
+    /// se aplican a los días de fuerza del 9/6/2026 en adelante; los anteriores
+    /// conservan lo que ya tenían.
+    /// v6: corrige los días ≥ 9/6 que en v5 quedaron sin actualizar por tener
+    /// datos sueltos cargados (de la rutina vieja). Ahora esos días también se
+    /// reemplazan por la rutina nueva, sean cuales sean sus datos previos.
+    static let version = 6
     private static let versionKey = "seededStrengthVersion"
+
+    /// Fecha desde la cual rige la rutina nueva del PDF. Los días de fuerza
+    /// anteriores no se tocan.
+    private static let newPlanCutoff = DateComponents.makeDate(year: 2026, month: 6, day: 9)
 
     private static var storedVersion: Int {
         let local = UserDefaults.standard.integer(forKey: versionKey)
@@ -128,27 +174,36 @@ enum StrengthSeed {
         guard storedVersion < version else { return }
         guard let days = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
 
+        let cal = PlanConstants.calendar
+        let cutoff = cal.startOfDay(for: newPlanCutoff)
+
         for day in days where day.type == .fuerza {
             let routine = templates(for: day)
+            // La rutina nueva (con fotos) sólo rige del 9/6 en adelante.
+            let isNewPlanDay = cal.startOfDay(for: day.date) >= cutoff
 
             if day.exercises.isEmpty {
-                insert(routine, into: day, context: context)
+                // Sólo sembramos la rutina nueva en los días del nuevo plan; los
+                // días vacíos anteriores se dejan como están.
+                if isNewPlanDay { insert(routine, into: day, context: context) }
                 continue
             }
 
             let routineNames = routine.map(\.name)
             let currentNames = day.orderedExercises.map(\.name)
-            let dayHasLoggedData = day.exercises.contains { $0.hasLoggedData }
 
-            if currentNames != routineNames && !dayHasLoggedData {
-                // El template del día cambió y no hay nada cargado: se reemplaza
-                // por la rutina actual (la eliminación arrastra sus series).
+            if isNewPlanDay && currentNames != routineNames {
+                // Día del nuevo plan que todavía no está en la rutina nueva: se
+                // reemplaza por completo (la eliminación arrastra sus series) y se
+                // refresca la descripción. Los días ≥ 9/6 son futuros, así que
+                // cualquier dato cargado ahí era de la rutina vieja y ya no aplica.
                 for exercise in day.exercises { context.delete(exercise) }
                 insert(routine, into: day, context: context)
+                day.longDescription = WorkoutSeed.longDescription(for: .fuerza, title: day.title)
             } else {
-                // Migración de ejercicios ya sembrados: completa reps objetivo
-                // (v2) y descanso recomendado (v3) sin pisar lo que el usuario
-                // haya editado (solo rellena los campos que falten).
+                // Resto: completa campos faltantes (reps objetivo, descanso,
+                // imagen) sin pisar lo que el usuario editó ni la rutina vieja
+                // de los días anteriores al 9/6 (cuyos nombres no coinciden).
                 let byName = Dictionary(uniqueKeysWithValues: routine.map { ($0.name, $0) })
                 for exercise in day.exercises {
                     guard let template = byName[exercise.name] else { continue }
@@ -158,6 +213,9 @@ enum StrengthSeed {
                     }
                     if exercise.restSeconds == nil {
                         exercise.restSeconds = template.rest
+                    }
+                    if exercise.imageName == nil {
+                        exercise.imageName = template.imageName
                     }
                 }
             }
@@ -177,6 +235,7 @@ enum StrengthSeed {
                 notes: template.note,
                 targetReps: target(for: template),
                 restSeconds: template.rest,
+                imageName: template.imageName,
                 day: day
             )
             context.insert(exercise)

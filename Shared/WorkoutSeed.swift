@@ -28,14 +28,15 @@ enum WorkoutSeed {
     """
 
     private static let descFuerzaA = """
-    Empuje (press banca, hombros, vuelos), pierna de mantenimiento (sentadilla y \
-    hip thrust moderados, sin fallo), core. Dejá 1-2 reps en reserva.
+    Arrancá con el circuito de acondicionamiento (3 vueltas, sin pausa entre \
+    ejercicios) y seguí con el específico, también en circuito. Después, el \
+    bloque principal de fuerza: tirón, pierna y brazos. Dejá 1-2 reps en reserva.
     """
 
     private static let descFuerzaB = """
-    Espalda y tríceps con foco en zona media. Arrancá con el circuito de zona \
-    media (3 vueltas seguidas, sin pausa entre ejercicios) y seguí con el bloque \
-    principal de tirón y tríceps. Dejá 1-2 reps en reserva.
+    Acondicionamiento y específico en circuito (3 vueltas cada uno, sin pausa \
+    entre ejercicios) y después el bloque principal: hombro, pecho, pierna y \
+    brazos. Cuidá la técnica en los unilaterales. Dejá 1-2 reps en reserva.
     """
 
     private static let descDescanso = """
@@ -49,7 +50,7 @@ enum WorkoutSeed {
     """
 
     /// Devuelve la descripción larga según el tipo y el título del entrenamiento.
-    private static func longDescription(for type: WorkoutType, title: String) -> String {
+    static func longDescription(for type: WorkoutType, title: String) -> String {
         switch type {
         case .fondo:    return descFondo
         case .calidad:  return descCalidad

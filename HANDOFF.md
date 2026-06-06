@@ -8,10 +8,17 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
 - Plan de entrenamiento con seed + reconciliación versionada.
 - Seguimiento de corridas con importación desde Apple Health (HealthKit).
 - Rutina de gimnasio (ejercicios/series/peso) + importación de métricas de
-  sesiones de fuerza desde Health. Plantillas Fuerza A (empuje+pierna+core) y
-  Fuerza B (espalda+tríceps+core, con bloque de zona media en circuito) en
-  `StrengthSeed`; `populateIfNeeded` reemplaza la rutina de un día si su plantilla
-  cambió y todavía no tiene nada cargado (respeta lo registrado). Migración puntual
+  sesiones de fuerza desde Health. Plantillas Fuerza A y Fuerza B = los dos días
+  del **plan de Megatlón** (entrenador Francisco Ambrosio): cada uno arranca con
+  circuito de acondicionamiento + específico (3 vueltas) y sigue con el bloque
+  principal de fuerza. Cada ejercicio lleva su **foto** (assets `r1_NN`/`r2_NN`
+  en `Maraton/Assets.xcassets`, importadas del PDF/web del plan) vía el campo
+  `Exercise.imageName`. Están en `StrengthSeed`; `populateIfNeeded` (v5) reemplaza
+  la rutina de un día si su plantilla cambió y no tiene nada cargado (respeta lo
+  registrado), **sólo para días de fuerza del 9/6/2026 en adelante** (piso
+  `newPlanCutoff`); los días anteriores conservan lo que tenían. Las fotos se
+  muestran en `GymSessionView` (miniatura, `ExerciseThumbnail`) y en
+  `GuidedGymSessionView` (imagen grande). Migración puntual
   `WorkoutSeed.applyThursdayGymSwapIfNeeded`: en la semana del 4-5/6/2026 dejó el
   jueves como gimnasio (Fuerza B) y movió la corrida de calidad al viernes.
 - Dashboard en 3 tabs: **Detalle** (vista de un día del plan, deslizable entre

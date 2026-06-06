@@ -142,7 +142,9 @@ private struct ExerciseSection: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .top, spacing: 12) {
+            ExerciseThumbnail(imageName: exercise.imageName)
+            VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(exercise.name)
                     .font(.headline)
@@ -175,6 +177,7 @@ private struct ExerciseSection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .textCase(nil)
+            }
             }
         }
         .alert("Renombrar ejercicio", isPresented: $showingRename) {
@@ -275,6 +278,34 @@ private struct SetRow: View {
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color(.tertiarySystemFill))
             )
+    }
+}
+
+// MARK: - Miniatura de la foto del ejercicio
+
+/// Muestra la foto del ejercicio (asset `imageName`). Si no hay imagen, dibuja
+/// un marcador con el ícono de mancuerna. Compartida con la sesión guiada.
+struct ExerciseThumbnail: View {
+    let imageName: String?
+    var size: CGFloat = 56
+
+    var body: some View {
+        Group {
+            if let imageName, UIImage(named: imageName) != nil {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Color(.tertiarySystemFill)
+                    Image(systemName: "dumbbell.fill")
+                        .font(.system(size: size * 0.4))
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
 

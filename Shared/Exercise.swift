@@ -29,6 +29,10 @@ final class Exercise {
     /// Descanso recomendado entre series, en segundos. Editable por el usuario.
     var restSeconds: Int?
 
+    /// Nombre del asset con la foto del ejercicio (ej. "r1_07"). Opcional:
+    /// los ejercicios cargados a mano no tienen imagen.
+    var imageName: String?
+
     /// Día de entrenamiento al que pertenece.
     var day: WorkoutDay?
 
@@ -43,6 +47,7 @@ final class Exercise {
         notes: String? = nil,
         targetReps: String? = nil,
         restSeconds: Int? = nil,
+        imageName: String? = nil,
         day: WorkoutDay? = nil
     ) {
         self.name = name
@@ -51,6 +56,7 @@ final class Exercise {
         self.notes = notes
         self.targetReps = targetReps
         self.restSeconds = restSeconds
+        self.imageName = imageName
         self.day = day
     }
 

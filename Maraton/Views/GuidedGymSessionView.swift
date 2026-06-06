@@ -87,6 +87,15 @@ struct GuidedGymSessionView: View {
 
                 ScrollView {
                     VStack(spacing: 16) {
+                        if let imageName = step.exercise.imageName, UIImage(named: imageName) != nil {
+                            Image(imageName)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: .infinity)
+                                .frame(maxHeight: 220)
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+
                         exerciseCard(step)
 
                         if let set = step.set {
