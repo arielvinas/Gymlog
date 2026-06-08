@@ -112,6 +112,16 @@ Tres carpetas = tres grupos sincronizados:
   ```
   Requiere el teléfono **desbloqueado** y el perfil de desarrollador confiado
   (Ajustes → General → VPN y gestión de dispositivos).
+  - ⚠️ **Cuenta gratuita ⇒ la firma vence a los 7 días**; se reinstala con los
+    mismos comandos (igual que el reloj). Tras instalar, la primera vez hay que
+    **confiar el perfil** en el iPhone (Ajustes → General → VPN y gestión de
+    dispositivos → App de desarrollador → Confiar); si no, al lanzar da
+    `invalid code signature / profile has not been explicitly trusted`.
+  - ⚠️ La firma automática (`-allowProvisioningUpdates`) **necesita la cuenta de
+    Apple ID logueada en Xcode** (Settings → Accounts: `<TU-APPLE-ID>`,
+    team personal `96B9D6W2NW`). Sin cuenta, el build falla con `No Accounts` /
+    `No profiles for 'ariel.Maraton' were found`. La identidad de firma vive en el
+    llavero (`Apple Development: <TU-APPLE-ID>`).
 - **Simulador:** iPhone 15 Pro (creado a mano; el Xcode trae sólo serie 17).
 - **Mac (Catalyst), prueba local sin cuenta** (la sesión de Xcode estaba
   rechazando el login; por eso firma ad-hoc "Sign to Run Locally"):
