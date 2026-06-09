@@ -9,6 +9,7 @@
 
 import Foundation
 import SwiftData
+import OSLog
 
 enum AppData {
 
@@ -16,7 +17,7 @@ enum AppData {
     /// de iCloud/CloudKit/Push reactivadas. Los equipos personales (cuenta
     /// gratuita) no admiten CloudKit, así que por ahora el almacenamiento es
     /// local en cada dispositivo (iPhone y reloj siembran el mismo plan).
-    static let iCloudSyncEnabled = false
+    static let iCloudSyncEnabled = true
 
     /// Entidades del modelo. Debe ser idéntico en todos los targets para que
     /// CloudKit no encuentre discrepancias el día que se active la sync.
@@ -27,6 +28,8 @@ enum AppData {
         ])
     }
 
+    static let log = Logger(subsystem: "ariel.Maraton", category: "AppData")
+
     /// Crea el contenedor. Con `iCloudSyncEnabled` usa CloudKit (con respaldo
     /// local si no está disponible); si no, almacenamiento local — offline-first.
     static func makeContainer() -> ModelContainer {
@@ -34,14 +37,23 @@ enum AppData {
 
         if iCloudSyncEnabled {
             let cloudConfig = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)
-            if let container = try? ModelContainer(for: schema, configurations: cloudConfig) {
+            do {
+                let container = try ModelContainer(for: schema, configurations: cloudConfig)
+                log.notice("ModelContainer creado con CloudKit (sync activa)")
                 return container
+            } catch {
+                // Si CloudKit falla NO lo silenciamos: el motivo (modelo
+                // incompatible, cuenta, entitlement…) queda en el log del sistema
+                // bajo el subsistema "ariel.Maraton". Caemos a local para no
+                // dejar la app inutilizable.
+                log.error("CloudKit NO disponible, se usa store local. Error: \(error, privacy: .public)")
             }
         }
 
         // Almacenamiento local (la app funciona igual sin iCloud).
         let localConfig = ModelConfiguration(schema: schema, cloudKitDatabase: .none)
         if let container = try? ModelContainer(for: schema, configurations: localConfig) {
+            log.notice("ModelContainer creado con store local")
             return container
         }
 

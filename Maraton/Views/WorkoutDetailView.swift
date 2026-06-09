@@ -123,9 +123,9 @@ struct WorkoutDetailView: View {
                     Text("Rutina de gimnasio")
                         .font(.headline)
                         .foregroundStyle(.primary)
-                    Text(day.exercises.isEmpty
+                    Text(day.orderedExercises.isEmpty
                          ? "Cargá tus ejercicios y series"
-                         : "\(day.exercises.count) ejercicio\(day.exercises.count == 1 ? "" : "s")")
+                         : "\(day.orderedExercises.count) ejercicio\(day.orderedExercises.count == 1 ? "" : "s")")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }

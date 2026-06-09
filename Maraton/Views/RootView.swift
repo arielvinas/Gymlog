@@ -85,16 +85,27 @@ private struct SidebarRootView: View {
     @Environment(Navigator.self) private var navigator
 
     var body: some View {
-        let selection = Binding<AppSection?>(
-            get: { navigator.section },
-            set: { if let value = $0 { navigator.section = value } }
-        )
-
         NavigationSplitView {
-            List(selection: selection) {
+            // En Mac Catalyst el `List(selection:)` con filas normales no cambia
+            // la selección al tocar (heredado del comportamiento de iOS, que solo
+            // selecciona en modo edición). Manejamos el tap con botones para que
+            // el click funcione igual que los atajos ⌘1/⌘2/⌘3.
+            List {
                 ForEach(AppSection.allCases) { section in
-                    Label(section.title, systemImage: section.symbol)
-                        .tag(Optional(section))
+                    Button {
+                        navigator.section = section
+                    } label: {
+                        Label(section.title, systemImage: section.symbol)
+                            .foregroundStyle(navigator.section == section ? Color.accentColor : Color.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(
+                        navigator.section == section
+                            ? Color.accentColor.opacity(0.15)
+                            : Color.clear
+                    )
                 }
             }
             .navigationTitle("Maratón")

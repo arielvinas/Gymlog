@@ -18,7 +18,7 @@ struct GymSessionView: View {
 
     var body: some View {
         List {
-            if day.exercises.isEmpty {
+            if day.orderedExercises.isEmpty {
                 emptyState
             } else {
                 Section {
@@ -89,7 +89,7 @@ struct GymSessionView: View {
         guard !nombre.isEmpty else { return }
         let exercise = Exercise(
             name: nombre,
-            order: day.exercises.count,
+            order: day.orderedExercises.count,
             dayDate: day.date,
             day: day
         )

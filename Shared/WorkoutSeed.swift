@@ -274,8 +274,8 @@ enum WorkoutSeed {
         // Viernes: de día de fuerza a corrida de calidad. Si no hay nada
         // registrado en el gimnasio, se quitan los ejercicios sobrantes.
         if let fri = days.first(where: { cal.isDate($0.date, inSameDayAs: viernes) }), fri.type == .fuerza {
-            if !fri.exercises.contains(where: { $0.hasLoggedData }) {
-                for exercise in fri.exercises { context.delete(exercise) }
+            if !fri.orderedExercises.contains(where: { $0.hasLoggedData }) {
+                for exercise in fri.orderedExercises { context.delete(exercise) }
             }
             fri.type = .calidad
             fri.title = "Calidad · 2×10' tempo"

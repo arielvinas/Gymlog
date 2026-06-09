@@ -112,14 +112,15 @@ Tres carpetas = tres grupos sincronizados:
   ```
   Requiere el teléfono **desbloqueado** y el perfil de desarrollador confiado
   (Ajustes → General → VPN y gestión de dispositivos).
-  - ⚠️ **Cuenta gratuita ⇒ la firma vence a los 7 días**; se reinstala con los
-    mismos comandos (igual que el reloj). Tras instalar, la primera vez hay que
-    **confiar el perfil** en el iPhone (Ajustes → General → VPN y gestión de
-    dispositivos → App de desarrollador → Confiar); si no, al lanzar da
-    `invalid code signature / profile has not been explicitly trusted`.
+  - ✅ **Cuenta de pago (Apple Developer Program) ⇒ la firma dura 1 año**, ya no
+    se vence a los 7 días (era así con la cuenta gratuita). Igual la primera vez
+    tras instalar puede pedir **confiar el perfil** en el iPhone (Ajustes →
+    General → VPN y gestión de dispositivos → App de desarrollador → Confiar); si
+    no, al lanzar da `invalid code signature / profile has not been explicitly
+    trusted`.
   - ⚠️ La firma automática (`-allowProvisioningUpdates`) **necesita la cuenta de
     Apple ID logueada en Xcode** (Settings → Accounts: `<TU-APPLE-ID>`,
-    team personal `96B9D6W2NW`). Sin cuenta, el build falla con `No Accounts` /
+    team `96B9D6W2NW`, ahora con membresía de pago). Sin cuenta, el build falla con `No Accounts` /
     `No profiles for 'ariel.Maraton' were found`. La identidad de firma vive en el
     llavero (`Apple Development: <TU-APPLE-ID>`).
 - **Simulador:** iPhone 15 Pro (creado a mano; el Xcode trae sólo serie 17).
@@ -180,50 +181,68 @@ Tres carpetas = tres grupos sincronizados:
       xcrun devicectl device process launch --device <COREDEVICE-ID-RELOJ> \
         ariel.Maraton.watchkitapp
       ```
-    - Cuenta gratuita ⇒ la firma **vence a los 7 días**; se reinstala con los
-      mismos comandos. La primera vez puede pedir confiar el perfil de desarrollo
-      en el reloj (Ajustes → General → Gestión de dispositivos y VPN → Confiar).
+    - Con la cuenta de pago la firma **dura 1 año** (antes, gratuita, vencía a los
+      7 días). La primera vez puede pedir confiar el perfil de desarrollo en el
+      reloj (Ajustes → General → Gestión de dispositivos y VPN → Confiar).
     - El pulso en vivo **sí** funciona en el reloj físico (en el simulador no).
 
 ## Pendientes / próximos pasos posibles
-- Activar iCloud (ver sección abajo) — requiere cuenta de pago.
-- Dejar la `.app` de Mac en una ubicación fija (hoy queda en `/tmp`).
+- ✅ iCloud **funcionando** iPhone ↔ Mac (9/6/2026, cuenta de pago) — ver sección abajo.
+- ⌚ **Reloj con iCloud: pendiente de redesplegar.** El device estaba `unavailable`;
+  comparte el mismo `AppData`/entitlements, así que sólo falta recompilar e instalar
+  la build nueva cuando esté disponible (ver sección del reloj).
+- La `.app` de Mac (dev) se dejó en **`/Applications/Maraton.app`** para abrirla desde
+  Spotlight/Launchpad; al recompilar hay que volver a copiarla ahí (el build sale a `/tmp`).
 - Posibles mejoras pedidas pero no hechas: ritmo objetivo en la tarjeta "Hoy",
   más suplementos, dosis/cantidad por suplemento.
 
-## ⚠️ Sincronización iCloud (PENDIENTE — requiere cuenta de pago)
-CloudKit + Push **no están permitidos en cuentas de desarrollador gratuitas**
-(equipos personales). Para activar la sync se necesita el **Apple Developer
-Program de pago (US$99/año)**. Hasta entonces, iPhone y Mac funcionan cada uno
-con su **base local** (no comparten datos todavía); al activar iCloud, ambos
-sincronizan automáticamente sin más cambios.
+## ✅ Sincronización iCloud (FUNCIONANDO — 9/6/2026, cuenta de pago, team 96B9D6W2NW)
+iPhone y Mac sincronizan vía el contenedor CloudKit compartido
+`iCloud.ariel.Maraton` (mismo container en los tres targets). Verificado end-to-end:
+la data del iPhone (40 días / 133 ejercicios / 405 series / 12 suplementos) bajó
+completa a la Mac. Se activó al pasar la cuenta `<TU-APPLE-ID>` al
+**Apple Developer Program de pago**. El **reloj** comparte el mismo `AppData` y
+entitlements; queda **pendiente** sólo redesplegar la build nueva cuando el device
+esté disponible. Para revertir: `AppData.iCloudSyncEnabled = false` (vuelve a store
+local en todos los dispositivos).
 
-La capa de datos ya quedó **preparada** (bajo riesgo, sin tocar datos actuales):
-- Todos los `@Model` tienen valores por defecto (requisito de CloudKit).
-- `ModelContainer` detrás del flag `AppData.iCloudSyncEnabled` (hoy `false`
-  → almacenamiento local, offline-first; el código CloudKit con fallback ya está).
-  El reloj usa el **mismo** `AppData` (schema/container/flag): hoy cada dispositivo
-  tiene su store local sembrado con el mismo plan; al activar iCloud, iPhone, Mac y
-  reloj sincronizan con el mismo interruptor.
-- Flag de sembrado del plan listo para usar iCloud Key-Value Store cuando se active.
-
-### Pasos para activar iCloud (cuando haya cuenta de pago)
-1. `Maraton/Maraton.entitlements`: reagregar
+### Qué se tocó para activarlo (todo ya aplicado)
+1. **Entitlements** iOS (`Maraton.entitlements`), Mac Catalyst (`Maraton-Catalyst.entitlements`)
+   y reloj (`MaratonWatch.entitlements`): `aps-environment` (`development`),
    `com.apple.developer.icloud-container-identifiers` (`iCloud.ariel.Maraton`),
    `com.apple.developer.icloud-services` (`CloudKit`),
-   `com.apple.developer.ubiquity-kvstore-identifier`
-   (`$(TeamIdentifierPrefix)$(CFBundleIdentifier)`) y
-   `aps-environment` (`development`).
-2. `project.pbxproj` (Debug y Release): agregar
+   `com.apple.developer.ubiquity-kvstore-identifier`. En **Catalyst** además
+   `com.apple.developer.icloud-container-environment = Development` y
+   `com.apple.security.network.client` (app sandbox; sin el `network.client`
+   CloudKit no llega al server).
+2. `project.pbxproj` (Debug y Release del target iOS):
    `INFOPLIST_KEY_UIBackgroundModes = "remote-notification";`.
-3. Quitar `@Attribute(.unique)` de `WorkoutDay.date`
-   (CloudKit no admite constraints únicos; la unicidad ya se valida por código).
-   Agregar el mismo entitlement de iCloud al reloj (`MaratonWatch.entitlements`),
-   con el mismo contenedor CloudKit, para que comparta datos con el iPhone.
-4. `AppData.iCloudSyncEnabled = true` (vale para iPhone, Mac y reloj).
-5. Compilar para device con `-allowProvisioningUpdates` (la firma automática
-   registra el contenedor `iCloud.ariel.Maraton` y la capability de Push).
+3. **Modelo apto para CloudKit** (`WorkoutDay`, `Exercise`, `ExerciseSet`, …):
+   - sin `@Attribute(.unique)` (se quitó de `WorkoutDay.date`; la unicidad por
+     fecha la valida el código en `WorkoutSeed`).
+   - **TODAS las relaciones opcionales, incluidas las to-many.** Esto fue el bug
+     central: `WorkoutDay.exercises` y `Exercise.sets` eran `[T] = []` (no
+     opcionales) y CloudKit las rechazaba con *"CloudKit integration requires that
+     all relationships be optional"* → `SwiftDataError.loadIssueModelContainer`, y
+     `AppData.makeContainer()` caía a store **local** en silencio. Se pasaron a
+     `[T]?` y se lee siempre por `orderedExercises` / `orderedSets`.
+4. `AppData.iCloudSyncEnabled = true`. `makeContainer()` loguea el error real si
+   CloudKit falla (subsistema `ariel.Maraton`) en vez de tragárselo.
+5. Compilar para device con `-allowProvisioningUpdates` (registra el contenedor y
+   Push). La Mac además hay que **registrarla** una vez desde Xcode (Run → "Register
+   this Mac…"); por CLI no se puede.
 
-Resolución de conflictos: comportamiento estándar de CloudKit (last-writer-wins).
-Migración: lightweight de SwiftData; al quitar `.unique` la primera vez puede
-haber un breve período de posibles duplicados entre dispositivos hasta sincronizar.
+### ⚠️ Gotchas aprendidos (para no repetir el día del reloj o de otra capability)
+- **Contenedor recién creado = propagación lenta.** Con la cuenta de pago activada
+  *ese mismo día*, el server de CloudKit rechazaba crear la zona
+  (`CKError 15 "Server Rejected Request"`) aunque la cuenta autenticaba bien. Se
+  destrabó al **abrir el contenedor en la consola** (icloud.developer.apple.com →
+  `iCloud.ariel.Maraton` → Development) y esperar un rato. No es un bug del código.
+- **El sembrado usa iCloud KVS como flag de "ya sembrado".** Con sync activa, sólo
+  un dispositivo siembra; los demás reciben la data por CloudKit. Si se borra el
+  store local pero queda el flag KVS, ese dispositivo arranca **vacío** hasta que
+  importe de CloudKit (es lo esperado, no un error).
+- **El log de la Mac de esta sesión venía vacío** porque el shell tiene una función
+  `log`; usar **`/usr/bin/log show ... --predicate 'process == "Maraton"'`**.
+- Resolución de conflictos: estándar de CloudKit (last-writer-wins). Migración:
+  lightweight de SwiftData (cambiar to-many a opcional es compatible).

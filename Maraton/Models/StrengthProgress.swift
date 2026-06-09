@@ -70,7 +70,7 @@ enum StrengthProgress {
 
     /// La mejor serie del ejercicio: mayor peso (desempata por reps).
     private static func topSet(of exercise: Exercise) -> TopSet? {
-        let conPeso = exercise.sets.compactMap { set -> (Double, Int)? in
+        let conPeso = exercise.orderedSets.compactMap { set -> (Double, Int)? in
             guard let w = set.weight else { return nil }
             return (w, set.reps ?? 0)
         }

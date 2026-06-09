@@ -60,7 +60,7 @@ struct WatchWorkoutView: View {
 
     @ViewBuilder
     private var gymAction: some View {
-        if day.exercises.isEmpty {
+        if day.orderedExercises.isEmpty {
             Label("Sin ejercicios cargados", systemImage: "dumbbell")
                 .font(.caption)
                 .foregroundStyle(.secondary)

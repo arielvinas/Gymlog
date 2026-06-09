@@ -11,8 +11,9 @@ import SwiftData
 @Model
 final class WorkoutDay {
     /// Fecha del entrenamiento (única dentro del plan).
-    /// Nota: al activar CloudKit hay que quitar `.unique` (no lo admite).
-    @Attribute(.unique) var date: Date = Date()
+    /// CloudKit no admite `.unique`; la unicidad por fecha se valida por código
+    /// (ver `WorkoutSeed`), no con un constraint del store.
+    var date: Date = Date()
 
     /// Título corto (ej. "Fondo largo 12 km").
     var title: String = ""
@@ -39,8 +40,10 @@ final class WorkoutDay {
     var isCompleted: Bool = false
 
     /// Ejercicios de gimnasio (solo se usan en días de fuerza).
+    /// Opcional porque CloudKit exige que TODAS las relaciones (incluidas las
+    /// to-many) lo sean; usar `orderedExercises` para leerla sin desempaquetar.
     @Relationship(deleteRule: .cascade, inverse: \Exercise.day)
-    var exercises: [Exercise] = []
+    var exercises: [Exercise]?
 
     // MARK: - Campos de registro (se completan al marcar como hecho)
 
@@ -97,6 +100,6 @@ final class WorkoutDay {
 
     /// Ejercicios ordenados por su posición en la sesión.
     var orderedExercises: [Exercise] {
-        exercises.sorted { $0.order < $1.order }
+        (exercises ?? []).sorted { $0.order < $1.order }
     }
 }

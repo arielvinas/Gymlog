@@ -216,21 +216,21 @@ enum StrengthSeed {
             // La rutina nueva (con fotos) sólo rige del 9/6 en adelante.
             let isNewPlanDay = cal.startOfDay(for: day.date) >= cutoff
 
-            if day.exercises.isEmpty {
+            if day.orderedExercises.isEmpty {
                 // Sólo sembramos la rutina nueva en los días del nuevo plan; los
                 // días vacíos anteriores se dejan como están.
                 if isNewPlanDay { insert(routine, into: day, context: context) }
                 continue
             }
 
-            let hasLogged = day.exercises.contains { $0.hasLoggedData }
+            let hasLogged = day.orderedExercises.contains { $0.hasLoggedData }
 
             if isNewPlanDay && !hasLogged {
                 // Día del nuevo plan todavía sin nada registrado: se reemplaza por
                 // completo (la eliminación arrastra sus series) y se refresca la
                 // descripción. Así toman los ajustes de carga (saltos reducidos,
                 // sentadilla moderada) y la regla de saltos de pico/taper.
-                for exercise in day.exercises { context.delete(exercise) }
+                for exercise in day.orderedExercises { context.delete(exercise) }
                 insert(routine, into: day, context: context)
                 day.longDescription = WorkoutSeed.longDescription(for: .fuerza, title: day.title)
             } else {
@@ -238,7 +238,7 @@ enum StrengthSeed {
                 // sólo los campos faltantes sin pisar lo que el usuario editó ni
                 // la rutina vieja.
                 let byName = Dictionary(uniqueKeysWithValues: routine.map { ($0.name, $0) })
-                for exercise in day.exercises {
+                for exercise in day.orderedExercises {
                     guard let template = byName[exercise.name] else { continue }
                     if exercise.targetReps == nil {
                         exercise.targetReps = target(for: template)

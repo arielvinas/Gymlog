@@ -275,20 +275,20 @@ final class GuidedSessionEngine {
 
     /// Series con datos cargados en todo el día.
     var loggedSetsCount: Int {
-        (day?.exercises ?? []).reduce(0) { acc, ex in
-            acc + ex.sets.filter { $0.reps != nil || $0.weight != nil }.count
+        (day?.orderedExercises ?? []).reduce(0) { acc, ex in
+            acc + ex.orderedSets.filter { $0.reps != nil || $0.weight != nil }.count
         }
     }
 
     /// Cantidad de ejercicios del día.
     var exerciseCount: Int {
-        day?.exercises.count ?? 0
+        day?.orderedExercises.count ?? 0
     }
 
     /// Volumen total levantado (kg) = Σ peso × reps.
     var totalVolume: Double {
-        (day?.exercises ?? []).reduce(0) { acc, ex in
-            acc + ex.sets.reduce(0) { sAcc, set in
+        (day?.orderedExercises ?? []).reduce(0) { acc, ex in
+            acc + ex.orderedSets.reduce(0) { sAcc, set in
                 guard let w = set.weight, let r = set.reps else { return sAcc }
                 return sAcc + w * Double(r)
             }

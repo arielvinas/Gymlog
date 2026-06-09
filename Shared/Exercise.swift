@@ -37,8 +37,10 @@ final class Exercise {
     var day: WorkoutDay?
 
     /// Series del ejercicio.
+    /// Opcional porque CloudKit exige que TODAS las relaciones (incluidas las
+    /// to-many) lo sean; usar `orderedSets` para leerla sin desempaquetar.
     @Relationship(deleteRule: .cascade, inverse: \ExerciseSet.exercise)
-    var sets: [ExerciseSet] = []
+    var sets: [ExerciseSet]?
 
     init(
         name: String,
@@ -70,12 +72,12 @@ final class Exercise {
 
     /// Series ordenadas por su número.
     var orderedSets: [ExerciseSet] {
-        sets.sorted { $0.order < $1.order }
+        (sets ?? []).sorted { $0.order < $1.order }
     }
 
     /// Indica si tiene al menos una serie con datos registrados.
     var hasLoggedData: Bool {
-        sets.contains { $0.reps != nil || $0.weight != nil }
+        (sets ?? []).contains { $0.reps != nil || $0.weight != nil }
     }
 
     /// Si el ejercicio se carga con peso. Los de peso corporal, banda, core,
