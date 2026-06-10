@@ -196,6 +196,48 @@ Tres carpetas = tres grupos sincronizados:
 - Posibles mejoras pedidas pero no hechas: ritmo objetivo en la tarjeta "Hoy",
   más suplementos, dosis/cantidad por suplemento.
 
+## 🚀 Publicación en App Store (EN CURSO — arrancado 10/6/2026)
+Decisiones tomadas: publicar **iPhone + Apple Watch** (el reloj viaja embebido, NO
+se publica la versión Mac Catalyst) y subir **a TestFlight primero**, probar la sync
+de CloudKit **Producción** instalada desde la nube y recién después enviar a revisión.
+
+Estado: `MARKETING_VERSION = 1.0`, `CURRENT_PROJECT_VERSION = 1` (sirve para el 1er
+release). Bundle iOS `ariel.Maraton`, reloj `ariel.Maraton.watchkitapp`. Icono 1024²
+y textos de uso de HealthKit (iOS + reloj) ya están.
+
+### Ya hecho
+- ✅ Declarada la **exención de criptografía**: `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`
+  en el target iOS (Debug y Release) en `project.pbxproj`. Evita la pregunta de
+  export compliance en cada envío (la app solo usa HTTPS/cripto estándar exenta).
+
+### Pendiente (próxima sesión) — manual salvo lo marcado
+1. ⚠️ **CRÍTICO: promocionar el schema de CloudKit a Production.**
+   icloud.developer.apple.com → contenedor `iCloud.ariel.Maraton` → Schema →
+   **Deploy Schema to Production**. Las builds de distribución de iOS usan el
+   contenedor de **Producción** (lo elige el perfil de distribución), que arranca
+   **vacío**. Sin esto, la app de TestFlight/Store **no sincroniza**. Es el riesgo
+   que queremos verificar en TestFlight antes de publicar.
+2. ⚠️ **Política de privacidad (URL).** Apple la **exige** por usar HealthKit. Hay
+   que hostearla (GitHub Pages / Notion público / etc.). *Claude puede redactarla*
+   (es-AR; datos 100% locales + iCloud propio del usuario, sin servidores propios)
+   — falta definir dónde se hospeda.
+3. **Crear la ficha** en App Store Connect (Apps → + → iOS, bundle `ariel.Maraton`).
+   ⚠️ El **nombre de la ficha debe ser único global**; "Maratón" casi seguro está
+   tomado. El nombre en el ícono puede seguir siendo "Maratón", pero el de la Store
+   quizá deba ser p.ej. "Maratón — Plan 21K". Definir 2-3 alternativas.
+4. **Metadata** (subtítulo, descripción, keywords, categoría) — *Claude puede
+   redactarla*. **Screenshots** los captura Ariel (iPhone 6.9"/6.5"; reloj opcional).
+5. **Archive + subida** (Xcode, firma de distribución): scheme `Maraton`, destino
+   *Any iOS Device* → Product → Archive → Organizer → Distribute App → App Store
+   Connect → Upload (que regenere el perfil de distribución).
+6. **Probar en TestFlight** (verificar CloudKit Producción end-to-end) → completar
+   ficha → **Submit for Review**.
+
+Notas/riesgos: el entitlement `aps-environment = development` NO es bloqueante
+(Xcode lo reescribe a `production` al firmar con perfil de distribución). El
+entitlement de Catalyst sigue en `icloud-container-environment = Development`, pero
+como NO se publica Mac, no se toca.
+
 ## ✅ Sincronización iCloud (FUNCIONANDO — 9/6/2026, cuenta de pago, team 96B9D6W2NW)
 iPhone y Mac sincronizan vía el contenedor CloudKit compartido
 `iCloud.ariel.Maraton` (mismo container en los tres targets). Verificado end-to-end:
