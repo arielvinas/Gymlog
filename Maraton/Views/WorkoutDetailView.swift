@@ -18,6 +18,7 @@ struct WorkoutDetailView: View {
     @State private var importError: String?
     @State private var showingEdit = false
     @State private var showingDeleteConfirm = false
+    @State private var showingExport = false
 
     var body: some View {
         ScrollView {
@@ -50,6 +51,11 @@ struct WorkoutDetailView: View {
                     } label: {
                         Label("Editar", systemImage: "pencil")
                     }
+                    Button {
+                        showingExport = true
+                    } label: {
+                        Label("Compartir día", systemImage: "square.and.arrow.up")
+                    }
                     Button(role: .destructive) {
                         showingDeleteConfirm = true
                     } label: {
@@ -65,6 +71,9 @@ struct WorkoutDetailView: View {
         }
         .sheet(isPresented: $showingEdit) {
             WorkoutEditView(editing: day)
+        }
+        .sheet(isPresented: $showingExport) {
+            DayExportSheet(day: day)
         }
         .alert("Apple Salud", isPresented: .constant(importError != nil)) {
             Button("Entendido") { importError = nil }
