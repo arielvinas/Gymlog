@@ -25,6 +25,7 @@ struct WatchGuidedSessionView: View {
     /// Último instante en que se difundió un snapshot (para limitar los refrescos
     /// de pulso a ~3 s mientras el iPhone está accesible).
     @State private var lastBroadcast = Date.distantPast
+    @State private var showingSwitch = false
 
     private let ticker = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
     private var tint: Color { WorkoutType.fuerza.color }
@@ -62,6 +63,9 @@ struct WatchGuidedSessionView: View {
         .onChange(of: engine.phase) { _, newPhase in
             if newPhase == .done { saveWorkoutMetrics() }
         }
+        .sheet(isPresented: $showingSwitch) {
+            WatchSwitchExerciseList(engine: engine)
+        }
     }
 
     // MARK: - Logging
@@ -78,8 +82,10 @@ struct WatchGuidedSessionView: View {
                 suggestedWeight: engine.suggestedWeight(for: step),
                 heartRate: workout.currentHeartRate,
                 canGoBack: engine.index > 0,
+                canSwitch: !engine.switchableExercises.isEmpty,
                 onDone: engine.completeCurrent,
-                onBack: engine.goBackFromLogging
+                onBack: engine.goBackFromLogging,
+                onSwitch: { showingSwitch = true }
             )
             .id(step.id)
         } else {
@@ -139,6 +145,16 @@ struct WatchGuidedSessionView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(overtime ? .red : tint)
+
+                if !engine.switchableExercises.isEmpty {
+                    Button { showingSwitch = true } label: {
+                        Label("Cambiar ejercicio", systemImage: "arrow.triangle.swap")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
             }
             .padding(.horizontal, 4)
             .padding(.vertical, 8)
@@ -274,8 +290,10 @@ private struct WatchLoggingView: View {
     let suggestedWeight: Double?
     let heartRate: Int
     let canGoBack: Bool
+    let canSwitch: Bool
     let onDone: () -> Void
     let onBack: () -> Void
+    let onSwitch: () -> Void
 
     /// Qué valor está "agarrado" por la corona. `nil` ⇒ la corona hace scroll.
     private enum Field { case weight, reps }
@@ -351,6 +369,16 @@ private struct WatchLoggingView: View {
                 if canGoBack {
                     Button(action: onBack) {
                         Label("Anterior", systemImage: "chevron.left")
+                            .font(.caption)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                }
+
+                if canSwitch {
+                    Button(action: onSwitch) {
+                        Label("Cambiar ejercicio", systemImage: "arrow.triangle.swap")
                             .font(.caption)
                             .frame(maxWidth: .infinity)
                     }
@@ -454,5 +482,45 @@ private struct WatchLoggingView: View {
         guard let set else { return }
         set.weight = weight > 0 ? weight : nil
         set.reps = reps > 0 ? Int(reps) : nil
+    }
+}
+
+// MARK: - Cambiar el próximo ejercicio (lista de pendientes)
+
+/// Lista de ejercicios pendientes para elegir cuál hacer ahora (p. ej. si la
+/// máquina del que seguía está ocupada). El elegido pasa a ser el próximo.
+private struct WatchSwitchExerciseList: View {
+    let engine: GuidedSessionEngine
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(engine.switchableExercises) { exercise in
+                    Button {
+                        engine.bringExerciseNext(exercise)
+                        dismiss()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(exercise.name)
+                                .font(.headline)
+                            Text(pendingLabel(exercise))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Cambiar")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private func pendingLabel(_ exercise: Exercise) -> String {
+        let pending = exercise.orderedSets.filter { !$0.isDone }.count
+        guard pending > 0 else {
+            return exercise.targetReps.map { "Objetivo \($0)" } ?? "Pendiente"
+        }
+        return "\(pending) serie\(pending == 1 ? "" : "s") pendiente\(pending == 1 ? "" : "s")"
     }
 }

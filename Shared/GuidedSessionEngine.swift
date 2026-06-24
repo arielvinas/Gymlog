@@ -152,6 +152,16 @@ final class GuidedSessionEngine {
         index >= steps.count - 1
     }
 
+    /// Ejercicios del día que todavía tienen series pendientes y no son el actual:
+    /// candidatos para traer al lugar del siguiente (p. ej. si la máquina del que
+    /// venía está ocupada y se quiere intercalar otro del plan).
+    var switchableExercises: [Exercise] {
+        guard let day, let current = currentStep?.exercise else { return [] }
+        return day.orderedExercises.filter { exercise in
+            exercise !== current && exercise.orderedSets.contains { !$0.isDone }
+        }
+    }
+
     /// Peso sugerido para la serie actual: el de la serie previa del mismo
     /// ejercicio que tenga peso cargado (solo si la serie actual aún no tiene).
     func suggestedWeight(for step: GuidedStep) -> Double? {
@@ -226,6 +236,34 @@ final class GuidedSessionEngine {
         index += 1
         phase = .logging
         prefillCurrentSet()
+    }
+
+    /// Trae `exercise` para que sea el **próximo** ejercicio: lo mueve justo
+    /// después del ejercicio actual, preservando la posición y todo lo registrado.
+    /// Sirve cuando la máquina del que seguía está ocupada y se intercala otro del
+    /// plan. No corta el descanso en curso (si está descansando, el nuevo queda
+    /// como "Sigue").
+    func bringExerciseNext(_ exercise: Exercise) {
+        guard let day, let current = currentStep else { return }
+        let currentExercise = current.exercise
+        guard exercise !== currentExercise else { return }
+        let savedSet = current.set
+
+        // Reordena los ejercicios del día: el elegido pasa a estar justo después
+        // del actual; se reasignan los `order` para persistir el nuevo orden.
+        var ordered = day.orderedExercises
+        ordered.removeAll { $0 === exercise }
+        guard let currentIdx = ordered.firstIndex(where: { $0 === currentExercise }) else { return }
+        ordered.insert(exercise, at: currentIdx + 1)
+        for (i, ex) in ordered.enumerated() { ex.order = i }
+        save()
+
+        // Reconstruye los pasos y reubica el índice en la misma serie actual.
+        buildSteps(from: day)
+        if let newIndex = steps.firstIndex(where: { $0.exercise === currentExercise && $0.set === savedSet }) {
+            index = newIndex
+        }
+        onStateChanged?()
     }
 
     /// Vuelve a la serie anterior para corregirla (la des-marca para recargarla).

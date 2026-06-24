@@ -20,6 +20,7 @@ struct GuidedGymSessionView: View {
 
     @State private var engine = GuidedSessionEngine()
     @State private var showingQuitConfirm = false
+    @State private var showingSwitch = false
 
     /// Tic del cronómetro (frecuente para que el anillo se vea fluido).
     private let ticker = Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()
@@ -59,6 +60,15 @@ struct GuidedGymSessionView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    if engine.phase != .done && !engine.switchableExercises.isEmpty {
+                        Button {
+                            showingSwitch = true
+                        } label: {
+                            Image(systemName: "arrow.triangle.swap")
+                        }
+                    }
+                }
             }
             .confirmationDialog(
                 "¿Salir de la sesión guiada?",
@@ -75,6 +85,9 @@ struct GuidedGymSessionView: View {
         .onAppear(perform: start)
         .onDisappear(perform: cleanup)
         .onReceive(ticker) { engine.tickRest(now: $0) }
+        .sheet(isPresented: $showingSwitch) {
+            SwitchExerciseSheet(engine: engine)
+        }
     }
 
     // MARK: - Pantalla de carga de serie
@@ -443,6 +456,65 @@ private struct LoggingCard: View {
     }
 
     private func save() { try? context.save() }
+}
+
+// MARK: - Cambiar el próximo ejercicio
+
+/// Lista de ejercicios pendientes para elegir cuál hacer ahora (p. ej. si la
+/// máquina del que seguía está ocupada). El elegido pasa a ser el próximo.
+private struct SwitchExerciseSheet: View {
+    let engine: GuidedSessionEngine
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(engine.switchableExercises) { exercise in
+                        Button {
+                            engine.bringExerciseNext(exercise)
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 12) {
+                                ExerciseThumbnail(imageName: exercise.imageName, size: 44)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(exercise.name)
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+                                    Text(pendingLabel(exercise))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: "arrow.up.to.line")
+                                    .foregroundStyle(WorkoutType.fuerza.color)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text("¿Qué hacés ahora?")
+                } footer: {
+                    Text("El ejercicio que elijas pasa a ser el próximo. El que seguía queda para después.")
+                }
+            }
+            .navigationTitle("Cambiar ejercicio")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func pendingLabel(_ exercise: Exercise) -> String {
+        let pending = exercise.orderedSets.filter { !$0.isDone }.count
+        guard pending > 0 else {
+            return exercise.targetReps.map { "Objetivo \($0)" } ?? "Pendiente"
+        }
+        return "\(pending) serie\(pending == 1 ? "" : "s") pendiente\(pending == 1 ? "" : "s")"
+    }
 }
 
 // MARK: - Aviso de fin de descanso (sonido + vibración)
