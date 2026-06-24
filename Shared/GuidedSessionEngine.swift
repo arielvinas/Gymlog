@@ -98,11 +98,14 @@ final class GuidedSessionEngine {
         buildSteps(from: day)
         index = firstIncompleteIndex()
         phase = .logging
+        prefillCurrentSet()
     }
 
     /// Asocia el contexto para poder guardar los cambios.
     func attach(context: ModelContext) {
         self.context = context
+        // Con el contexto ya disponible se completa el peso desde el historial.
+        prefillCurrentSet()
     }
 
     private func buildSteps(from day: WorkoutDay) {
@@ -161,6 +164,43 @@ final class GuidedSessionEngine {
         return nil
     }
 
+    // MARK: - Prellenado
+
+    /// Pre-carga la serie actual para registrar más rápido: las **reps** quedan en
+    /// el objetivo del plan (solo se editan si no se llega) y el **peso** en el
+    /// último usado (la serie previa de esta sesión, o el de la última sesión del
+    /// ejercicio; solo se edita si se sube). Solo completa valores vacíos: nunca
+    /// pisa lo que el usuario ya cargó.
+    private func prefillCurrentSet() {
+        guard let step = currentStep, let set = step.set else { return }
+
+        if set.reps == nil, let target = targetReps(of: step.exercise) {
+            set.reps = target
+        }
+
+        if step.exercise.tracksWeight, set.weight == nil {
+            if let previous = suggestedWeight(for: step) {
+                set.weight = previous
+            } else if let context, let last = ExerciseHistory.lastWeight(
+                name: step.exercise.name,
+                before: step.exercise.dayDate,
+                context: context
+            ) {
+                set.weight = last
+            }
+        }
+
+        save()
+    }
+
+    /// Repeticiones objetivo del plan como número: el valor más alto que aparece
+    /// en `targetReps` (ej. "6-8" → 8, "10" → 10, "30 s" → 30). La meta a alcanzar.
+    private func targetReps(of exercise: Exercise) -> Int? {
+        guard let text = exercise.targetReps else { return nil }
+        let numbers = text.split { !$0.isNumber }.compactMap { Int($0) }
+        return numbers.max()
+    }
+
     // MARK: - Acciones
 
     /// Marca la serie actual como hecha y avanza: al descanso (si hay próxima
@@ -185,6 +225,7 @@ final class GuidedSessionEngine {
         restOvertime = 0
         index += 1
         phase = .logging
+        prefillCurrentSet()
     }
 
     /// Vuelve a la serie anterior para corregirla (la des-marca para recargarla).

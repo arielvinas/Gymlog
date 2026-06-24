@@ -361,6 +361,14 @@ private struct WatchLoggingView: View {
             .padding(.horizontal, 4)
         }
         .onAppear(perform: prefill)
+        .onChange(of: set?.weight) { _, newValue in
+            // El engine puede pre-cargar el peso (del historial) recién después
+            // del primer render: si todavía no se tocó, reflejarlo en la corona.
+            if weight == 0, let newValue { weight = newValue }
+        }
+        .onChange(of: set?.reps) { _, newValue in
+            if reps == 0, let newValue { reps = Double(newValue) }
+        }
     }
 
     /// Peso: tocá para seleccionar y girá la corona (paso 1.25 kg).

@@ -42,4 +42,34 @@ enum ExerciseHistory {
         guard !resumenSeries.isEmpty else { return nil }
         return resumenSeries
     }
+
+    /// Peso de trabajo de la última sesión previa del ejercicio: el mayor peso
+    /// cargado en la sesión anterior más reciente (las series de trabajo suelen
+    /// ser las más pesadas; ignora entradas sin peso). `nil` si no hay histórico.
+    @MainActor
+    static func lastWeight(
+        name: String,
+        before currentDate: Date,
+        context: ModelContext
+    ) -> Double? {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        var descriptor = FetchDescriptor<Exercise>(
+            predicate: #Predicate { exercise in
+                exercise.name == trimmed && exercise.dayDate < currentDate
+            },
+            sortBy: [SortDescriptor(\Exercise.dayDate, order: .reverse)]
+        )
+        descriptor.fetchLimit = 10
+
+        guard let matches = try? context.fetch(descriptor) else { return nil }
+
+        // Primera sesión previa (más reciente) que tenga al menos un peso cargado.
+        for previous in matches {
+            let weights = previous.orderedSets.compactMap { $0.weight }
+            if let maxWeight = weights.max() { return maxWeight }
+        }
+        return nil
+    }
 }
