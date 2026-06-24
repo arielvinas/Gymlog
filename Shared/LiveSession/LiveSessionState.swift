@@ -22,7 +22,7 @@ enum LiveSessionPhase: String, Codable, Sendable {
 
 /// Foto del estado de la sesión que el reloj difunde al iPhone. Todo lo que la
 /// app y la Live Activity necesitan para dibujar, sin tener que leer SwiftData.
-struct LiveSessionSnapshot: Codable, Sendable, Equatable {
+struct LiveSessionSnapshot: Codable, Sendable, Hashable {
     /// Identifica la sesión en curso; descarta snapshots/comandos de otra previa.
     var sessionID: UUID
     /// Fecha del `WorkoutDay` (para mapear al día correcto en cada dispositivo).

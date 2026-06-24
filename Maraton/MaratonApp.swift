@@ -19,6 +19,12 @@ struct MaratonApp: App {
         // Pre-carga el plan, aplica novedades por versión y siembra la rutina
         // de fuerza (lógica compartida con la app del reloj, en `AppData`).
         AppData.seed(context: container.mainContext)
+
+        // Canal en vivo con el Apple Watch: recibe los snapshots de la sesión y
+        // los refleja en la Live Activity (pantalla bloqueada / Dynamic Island).
+        let link = LiveSessionConnectivity.shared
+        link.onSnapshot = { LiveActivityController.handle($0) }
+        link.activate()
     }
 
     var body: some Scene {

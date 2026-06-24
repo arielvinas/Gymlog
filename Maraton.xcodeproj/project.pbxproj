@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		DA7A0001000000000000000C /* MaratonWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = DA7A00010000000000000003 /* MaratonWatch Watch App.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		DA7A0002000000000000000C /* MaratonLiveActivity.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DA7A00020000000000000003 /* MaratonLiveActivity.appex */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -17,6 +18,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = DA7A00010000000000000004;
 			remoteInfo = "MaratonWatch Watch App";
+		};
+		DA7A0002000000000000000E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = B247CCD22FCBCA3400BD532C /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = DA7A00020000000000000004;
+			remoteInfo = MaratonLiveActivity;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -32,11 +40,23 @@
 			name = "Embed Watch Content";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA7A0002000000000000000B /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				DA7A0002000000000000000C /* MaratonLiveActivity.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		B247CCDA2FCBCA3400BD532C /* Maraton.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Maraton.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DA7A00010000000000000003 /* MaratonWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "MaratonWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		DA7A00020000000000000003 /* MaratonLiveActivity.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = MaratonLiveActivity.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -46,6 +66,13 @@
 				Info.plist,
 			);
 			target = DA7A00010000000000000004 /* MaratonWatch Watch App */;
+		};
+		DA7A0002000000000000000F /* Exceptions for "MaratonLiveActivity" folder in "MaratonLiveActivity" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = DA7A00020000000000000004 /* MaratonLiveActivity */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -68,6 +95,14 @@
 			path = "MaratonWatch Watch App";
 			sourceTree = "<group>";
 		};
+		DA7A00020000000000000001 /* MaratonLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				DA7A0002000000000000000F /* Exceptions for "MaratonLiveActivity" folder in "MaratonLiveActivity" target */,
+			);
+			path = MaratonLiveActivity;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +120,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA7A00020000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -94,6 +136,7 @@
 				B247CCDC2FCBCA3400BD532C /* Maraton */,
 				DA7A00010000000000000001 /* Shared */,
 				DA7A00010000000000000002 /* MaratonWatch Watch App */,
+				DA7A00020000000000000001 /* MaratonLiveActivity */,
 				B247CCDB2FCBCA3400BD532C /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,6 +146,7 @@
 			children = (
 				B247CCDA2FCBCA3400BD532C /* Maraton.app */,
 				DA7A00010000000000000003 /* MaratonWatch Watch App.app */,
+				DA7A00020000000000000003 /* MaratonLiveActivity.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -118,11 +162,13 @@
 				B247CCD72FCBCA3400BD532C /* Frameworks */,
 				B247CCD82FCBCA3400BD532C /* Resources */,
 				DA7A0001000000000000000B /* Embed Watch Content */,
+				DA7A0002000000000000000B /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				DA7A0001000000000000000D /* PBXTargetDependency */,
+				DA7A0002000000000000000D /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				B247CCDC2FCBCA3400BD532C /* Maraton */,
@@ -158,6 +204,29 @@
 			productReference = DA7A00010000000000000003 /* MaratonWatch Watch App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		DA7A00020000000000000004 /* MaratonLiveActivity */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DA7A00020000000000000008 /* Build configuration list for PBXNativeTarget "MaratonLiveActivity" */;
+			buildPhases = (
+				DA7A00020000000000000005 /* Sources */,
+				DA7A00020000000000000006 /* Frameworks */,
+				DA7A00020000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				DA7A00020000000000000001 /* MaratonLiveActivity */,
+				DA7A00010000000000000001 /* Shared */,
+			);
+			name = MaratonLiveActivity;
+			packageProductDependencies = (
+			);
+			productName = MaratonLiveActivity;
+			productReference = DA7A00020000000000000003 /* MaratonLiveActivity.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -172,6 +241,9 @@
 						CreatedOnToolsVersion = 26.5;
 					};
 					DA7A00010000000000000004 = {
+						CreatedOnToolsVersion = 26.5;
+					};
+					DA7A00020000000000000004 = {
 						CreatedOnToolsVersion = 26.5;
 					};
 				};
@@ -192,6 +264,7 @@
 			targets = (
 				B247CCD92FCBCA3400BD532C /* Maraton */,
 				DA7A00010000000000000004 /* MaratonWatch Watch App */,
+				DA7A00020000000000000004 /* MaratonLiveActivity */,
 			);
 		};
 /* End PBXProject section */
@@ -205,6 +278,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		DA7A00010000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DA7A00020000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -228,6 +308,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		DA7A00020000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -236,6 +323,12 @@
 			platformFilter = ios;
 			target = DA7A00010000000000000004 /* MaratonWatch Watch App */;
 			targetProxy = DA7A0001000000000000000E /* PBXContainerItemProxy */;
+		};
+		DA7A0002000000000000000D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = DA7A00020000000000000004 /* MaratonLiveActivity */;
+			targetProxy = DA7A0002000000000000000E /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -375,6 +468,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Maratón lee tus entrenamientos y métricas de Apple Salud (distancia, frecuencia cardíaca, calorías, FC en reposo, variabilidad, VO2 máx, peso y sueño) para autocompletar tus corridas y armar tu reporte de progreso.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = "remote-notification";
@@ -414,6 +508,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Maratón lee tus entrenamientos y métricas de Apple Salud (distancia, frecuencia cardíaca, calorías, FC en reposo, variabilidad, VO2 máx, peso y sueño) para autocompletar tus corridas y armar tu reporte de progreso.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIBackgroundModes = "remote-notification";
@@ -501,6 +596,70 @@
 			};
 			name = Release;
 		};
+		DA7A00020000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 96B9D6W2NW;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MaratonLiveActivity/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Maratón";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ariel.Maraton.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		DA7A0002000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 96B9D6W2NW;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "MaratonLiveActivity/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Maratón";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = ariel.Maraton.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -527,6 +686,15 @@
 			buildConfigurations = (
 				DA7A00010000000000000009 /* Debug */,
 				DA7A0001000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		DA7A00020000000000000008 /* Build configuration list for PBXNativeTarget "MaratonLiveActivity" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				DA7A00020000000000000009 /* Debug */,
+				DA7A0002000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
