@@ -34,6 +34,13 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
   fracción— y `CountWheelField` —reps o segundos según `Exercise.isTimeBased`—,
   ambos en `GymSessionView.swift`). El campo de **peso se oculta** en ejercicios
   sin peso (`Exercise.tracksWeight`).
+- **Series pre-cargadas (sesión guiada):** al llegar a cada serie, el engine
+  (`GuidedSessionEngine.prefillCurrentSet`) la pre-completa: **reps** = objetivo
+  del plan (número más alto del rango, ej. "6-8" → 8) y **peso** = el de la serie
+  previa de la sesión, o el último usado en el ejercicio
+  (`ExerciseHistory.lastWeight`, el más pesado de la última sesión). Solo completa
+  lo vacío (nunca pisa lo cargado). Así se editan las reps solo si no se llegan y
+  el peso una vez (o al subir). Vale para reloj + iPhone guiado + Live Activity.
 - Dashboard en 3 tabs: **Detalle** (vista de un día del plan, deslizable entre
   todos los días o saltando desde la tira de la semana; muestra qué toca, datos de
   la semana de ese día, última corrida y suplementos del día —permite marcar
@@ -58,15 +65,38 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
   de la 1ª página (PDFKit). Los datos se arman en `ProgressReportBuilder`
   (`ProgressReport.swift`) y las métricas de Salud en `HealthManager.snapshot(from:to:)`.
 
+- **Exportar un día de entrenamiento (PDF):** desde el menú ⋯ de
+  `WorkoutDetailView` → "Compartir día". En días de fuerza arma una tabla de
+  **peso × reps por serie** de cada ejercicio + volumen por ejercicio y total; en
+  corridas, km/ritmo/FC/calorías/esfuerzo. Misma maquinaria de PDF
+  (`DayExportView` + `DayPDF`→`ImageRenderer` + `ShareLink` `DayPDFFile`) en
+  `Maraton/Views/DayExportView.swift`.
+
+- **Sesión guiada en vivo reloj→iPhone + Live Activity (lock screen / Dynamic
+  Island):** al empezar la sesión guiada en el **Apple Watch**, se ve y controla
+  en vivo desde el iPhone. El **reloj es la autoridad** (corre el engine, muta
+  SwiftData); el iPhone es **espejo + control remoto**. Transporte =
+  **WatchConnectivity** (`Shared/LiveSession/LiveSessionConnectivity.swift`):
+  `sendMessage` en vivo + `transferUserInfo` durable (despierta la app iOS en
+  background) + `updateApplicationContext`. El reloj difunde `LiveSessionSnapshot`
+  en cada `onStateChanged`; el iPhone manda `LiveSessionCommand`. En la app: banner
+  + `LiveSessionMirrorView` (Hecho/Saltear/±15/Anterior). En pantalla bloqueada:
+  **Live Activity** (target nuevo `MaratonLiveActivity`) con cronómetro nativo
+  `Text(timerInterval:)` y botones interactivos (`AdvanceSetIntent`/`SkipRestIntent`,
+  su `perform()` corre en el proceso de la app y rutea el comando al reloj). Sin
+  servidor ⇒ los avances con el teléfono bloqueado llegan por wake de WC (≈1-2 s),
+  el cronómetro corre solo. Detalle en la memoria [[live-activity-sync]].
+
 - **Versión Mac (Mac Catalyst):** mismo target. Barra lateral
   (`NavigationSplitView`), ventana redimensionable, menú "Ir a" con atajos
   ⌘1/⌘2/⌘3. Apple Salud se oculta en Mac (no existe). UI adaptable en
   `RootView.swift` (`#if targetEnvironment(macCatalyst)`).
 
 ## Estructura del código
-Tres carpetas = tres grupos sincronizados:
-- `Shared/` — **código agnóstico de plataforma, compilado por iOS Y watchOS.**
-  Modelos SwiftData (`WorkoutDay`, `Exercise`, `ExerciseSet`, `SupplementLog`,
+Cuatro targets / carpetas (grupos sincronizados):
+- `Shared/` — **código agnóstico de plataforma, compilado por iOS Y watchOS** (y el
+  subgrupo `Shared/LiveSession/` también por la extensión). Modelos SwiftData
+  (`WorkoutDay`, `Exercise`, `ExerciseSet`, `SupplementLog`,
   `SupplementReminder`), helpers (`WorkoutSeed`, `StrengthSeed`, `ExerciseHistory`,
   `PlanConstants`, formateadores), `GuidedSessionEngine` (máquina de estados de la
   sesión de gimnasio guiada, **compartida iPhone ↔ reloj**; al terminar el descanso
@@ -93,10 +123,16 @@ Tres carpetas = tres grupos sincronizados:
   vía `HKWorkoutSession` y, al terminar, guarda el `HKWorkout` de fuerza en Apple Salud),
   `Info.plist`, `MaratonWatch.entitlements`, `Assets` (incluye el `AppIcon`, el mismo PNG
   1024² del iPhone).
+- `MaratonLiveActivity/` — **Widget Extension** (target `MaratonLiveActivity`,
+  bundle `ariel.Maraton.LiveActivity`), embebido en la app iOS. Solo dibuja la Live
+  Activity (lock screen + Dynamic Island) y declara los `LiveActivityIntent`. Su
+  target incluye el grupo `Shared` (reusa modelos/conectividad). Se agregó
+  **editando `project.pbxproj` a mano** (UUIDs `DA7A0002…`); ver [[live-activity-sync]].
 - Proyecto usa **PBXFileSystemSynchronizedRootGroup**: los archivos nuevos en una
   carpeta se agregan solos a los targets que la incluyen (no hace falta editar el
-  `.pbxproj`). El `Info.plist` del reloj queda excluido de recursos vía
-  `membershipExceptions` (si no, choca con `INFOPLIST_FILE`).
+  `.pbxproj`). Los `Info.plist` del reloj y de la extensión quedan excluidos de
+  recursos vía `membershipExceptions` (si no, chocan con `INFOPLIST_FILE`).
+  Para un **target nuevo** (como la extensión) sí hay que tocar el `.pbxproj`.
 
 ## Build / deploy (CLI)
 - **iPhone físico:** "iPhone de Ariel", iPhone 15 Pro, UDID hardware
@@ -185,6 +221,12 @@ Tres carpetas = tres grupos sincronizados:
       7 días). La primera vez puede pedir confiar el perfil de desarrollo en el
       reloj (Ajustes → General → Gestión de dispositivos y VPN → Confiar).
     - El pulso en vivo **sí** funciona en el reloj físico (en el simulador no).
+    - ⚠️ Para instalar por CLI el **reloj tiene que estar DESBLOQUEADO** (si no:
+      `kAMDMobileImageMounterDeviceLocked`). Si `-destination 'id=…'` tira "developer
+      disk image could not be mounted", compilar con `-destination
+      'generic/platform=watchOS'` y después `devicectl device install` (monta la DDI
+      por su cuenta). Lanzar por CLI puede fallar si el reloj está en la esfera
+      ("Navigation away from clock not allowed"): abrir la app a mano en el reloj.
 
 ## Pendientes / próximos pasos posibles
 - ✅ iCloud **funcionando** iPhone ↔ Mac (9/6/2026, cuenta de pago) — ver sección abajo.
