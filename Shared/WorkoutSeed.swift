@@ -224,6 +224,49 @@ enum WorkoutSeed {
         markSeeded(planVersion)
     }
 
+    // MARK: - Deduplicación de días (limpieza de copias por doble sembrado)
+
+    /// Elimina días **duplicados por fecha**. Aparecen cuando dos dispositivos
+    /// (p. ej. iPhone y reloj) siembran el plan antes de que CloudKit sincronice
+    /// el flag "ya sembrado", quedando dos registros por fecha. Conserva el más
+    /// "rico" (completado / con datos cargados) y borra el resto. Idempotente: si
+    /// no hay duplicados, no hace nada. **Pensado para correr en un solo
+    /// dispositivo** (el iPhone); las eliminaciones se propagan por CloudKit.
+    static func deduplicateDays(context: ModelContext) {
+        guard let all = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
+        let cal = PlanConstants.calendar
+        let groups = Dictionary(grouping: all) { cal.startOfDay(for: $0.date) }
+
+        var deleted = false
+        for (_, días) in groups where días.count > 1 {
+            // Gana el más rico; desempata por id estable (consistente en el device).
+            let sorted = días.sorted { a, b in
+                let ra = richness(a), rb = richness(b)
+                if ra != rb { return ra > rb }
+                return String(describing: a.persistentModelID) < String(describing: b.persistentModelID)
+            }
+            for loser in sorted.dropFirst() {
+                context.delete(loser)
+                deleted = true
+            }
+        }
+        if deleted { try? context.save() }
+    }
+
+    /// Puntaje de "riqueza" de un día para elegir cuál conservar al deduplicar.
+    private static func richness(_ day: WorkoutDay) -> Int {
+        var score = 0
+        if day.isCompleted { score += 1000 }
+        if day.actualKm != nil { score += 200 }
+        if day.durationMinutes != nil { score += 50 }
+        if day.avgHeartRate != nil { score += 20 }
+        if let notes = day.notes, !notes.isEmpty { score += 10 }
+        score += day.orderedExercises.reduce(0) { acc, exercise in
+            acc + exercise.orderedSets.filter { $0.reps != nil || $0.weight != nil }.count
+        }
+        return score
+    }
+
     // MARK: - Ajuste puntual semana 1 (jueves gimnasio / viernes calidad)
 
     private static let thursdaySwapKey = "appliedThursdayGymSwapV1"

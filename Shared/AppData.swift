@@ -70,5 +70,12 @@ enum AppData {
         WorkoutSeed.applyThursdayGymSwapIfNeeded(context: context)
         WorkoutSeed.applyNewStructureIfNeeded(context: context)
         StrengthSeed.populateIfNeeded(context: context)
+
+        // Limpia días duplicados (doble sembrado iPhone/reloj antes de sincronizar).
+        // Solo el iPhone deduplica: un único limpiador evita carreras entre
+        // dispositivos; las eliminaciones se propagan por CloudKit al reloj y la Mac.
+        #if os(iOS) && !targetEnvironment(macCatalyst)
+        WorkoutSeed.deduplicateDays(context: context)
+        #endif
     }
 }
