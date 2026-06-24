@@ -71,11 +71,13 @@ enum AppData {
         WorkoutSeed.applyNewStructureIfNeeded(context: context)
         StrengthSeed.populateIfNeeded(context: context)
 
-        // Limpia días duplicados (doble sembrado iPhone/reloj antes de sincronizar).
-        // Solo el iPhone deduplica: un único limpiador evita carreras entre
-        // dispositivos; las eliminaciones se propagan por CloudKit al reloj y la Mac.
+        // Limpia días duplicados (doble sembrado iPhone/reloj antes de sincronizar)
+        // y aplica la etapa de recuperación de rodilla (24/6→5/7). Solo el iPhone:
+        // un único ejecutor evita altas/bajas de registros en paralelo; los cambios
+        // se propagan por CloudKit al reloj y la Mac.
         #if os(iOS) && !targetEnvironment(macCatalyst)
         WorkoutSeed.deduplicateDays(context: context)
+        WorkoutSeed.applyKneeRecoveryIfNeeded(context: context)
         #endif
     }
 }

@@ -122,20 +122,20 @@ enum WorkoutSeed {
         Week(title: "Semana 4", tag: nil, entries: [
             Entry(year: 2026, month: 6, day: 22, title: "Descanso / movilidad", detail: "", type: .descanso),
             Entry(year: 2026, month: 6, day: 23, title: "Fuerza A", detail: "Día 1", type: .fuerza),
-            Entry(year: 2026, month: 6, day: 24, title: "Rodaje suave 6 km", detail: "Z2", type: .rodaje),
-            Entry(year: 2026, month: 6, day: 25, title: "Calidad · 2×8' o 20' continuos", detail: "Tempo controlado", type: .calidad),
-            Entry(year: 2026, month: 6, day: 26, title: "Fuerza B", detail: "Día 2", type: .fuerza),
-            Entry(year: 2026, month: 6, day: 27, title: "Descanso", detail: "", type: .descanso),
-            Entry(year: 2026, month: 6, day: 28, title: "Fondo 13-14 km", detail: "Arranca el taper", type: .fondo),
+            Entry(year: 2026, month: 6, day: 24, title: "Descanso de rodilla + movilidad", detail: "Movilidad, elongación de gemelo/sóleo y protocolo de Alfredson. Caminar normal sí; no correr ni testear la rodilla a propósito.", type: .descanso),
+            Entry(year: 2026, month: 6, day: 25, title: "Fuerza · Día 2 (tren superior + core)", detail: "Sin pierna pesada ni saltos. Sumar Alfredson.", type: .fuerza),
+            Entry(year: 2026, month: 6, day: 26, title: "Descanso / movilidad", detail: "Movilidad y Alfredson.", type: .descanso),
+            Entry(year: 2026, month: 6, day: 27, title: "Descanso", detail: "Que la rodilla llegue fresca al trote de prueba. Movilidad ligera opcional.", type: .descanso),
+            Entry(year: 2026, month: 6, day: 28, title: "Trote de PRUEBA (decisión rodilla)", detail: "15-20 min muy suave (Zona 2), en llano. Llevar el donut en el dedo. Es el test que define si la rodilla está para la carrera: si no duele corriendo ni al día siguiente, buena señal; si duele, cambia la pisada o aparece al otro día, no correr.", type: .calidad),
         ]),
         Week(title: "Semana 5", tag: "Taper", entries: [
-            Entry(year: 2026, month: 6, day: 29, title: "Descanso / movilidad", detail: "", type: .descanso),
-            Entry(year: 2026, month: 6, day: 30, title: "Fuerza liviana", detail: "Mitad de series, sin saltos, sin pierna pesada", type: .fuerza),
-            Entry(year: 2026, month: 7, day: 1, title: "Rodaje suave 4-5 km", detail: "Z2", type: .rodaje),
-            Entry(year: 2026, month: 7, day: 2, title: "Tempo corto 10-15'", detail: "", type: .calidad),
-            Entry(year: 2026, month: 7, day: 3, title: "Descanso o trote muy corto 10'", detail: "", type: .descanso),
-            Entry(year: 2026, month: 7, day: 4, title: "Descanso total", detail: "Hidratar + cargar hidratos", type: .descanso),
-            Entry(year: 2026, month: 7, day: 5, title: "Media Maratón Córdoba", detail: "21,1 km", type: .carrera),
+            Entry(year: 2026, month: 6, day: 29, title: "Descanso (evaluar rodilla)", detail: "Clave: cómo respondió la rodilla al trote de ayer. Sin dolor = seguimos. Con dolor = replantear la carrera.", type: .descanso),
+            Entry(year: 2026, month: 6, day: 30, title: "Fuerza liviana (tren superior)", detail: "Mitad de series, sin pierna ni saltos. Solo si la rodilla viene bien.", type: .fuerza),
+            Entry(year: 2026, month: 7, day: 1, title: "Trote suave 4-5 km (condicional)", detail: "Solo si el trote del domingo salió sin dolor. Muy suave, Zona 2. Si la rodilla protesta, descanso.", type: .rodaje),
+            Entry(year: 2026, month: 7, day: 2, title: "Trote suave 15 min + unos pocos cambios de ritmo (condicional)", detail: "Solo si todo viene sin dolor. Nada exigente. Última activación antes de la carrera.", type: .calidad),
+            Entry(year: 2026, month: 7, day: 3, title: "Descanso", detail: "Movilidad ligera.", type: .descanso),
+            Entry(year: 2026, month: 7, day: 4, title: "Descanso total (víspera)", detail: "Hidratar, cargar hidratos, preparar todo: donut, vendaje, ropa.", type: .descanso),
+            Entry(year: 2026, month: 7, day: 5, title: "Media Maratón Córdoba 21,1 km", detail: "Correr SOLO si la rodilla respondió bien a las pruebas. Si hay dolor que cambia la pisada, parar. La salud vale más que terminar.", type: .carrera),
         ]),
     ]
 
@@ -385,5 +385,104 @@ enum WorkoutSeed {
 
         try? context.save()
         markNewStructureApplied()
+    }
+
+    // MARK: - Etapa de recuperación de rodilla (24/6 → 5/7/2026)
+
+    private static let kneeRecoveryKey = "appliedKneeRecoveryV1"
+
+    private static var kneeRecoveryApplied: Bool {
+        let local = UserDefaults.standard.bool(forKey: kneeRecoveryKey)
+        guard AppData.iCloudSyncEnabled else { return local }
+        return local || NSUbiquitousKeyValueStore.default.bool(forKey: kneeRecoveryKey)
+    }
+
+    private static func markKneeRecoveryApplied() {
+        UserDefaults.standard.set(true, forKey: kneeRecoveryKey)
+        if AppData.iCloudSyncEnabled {
+            NSUbiquitousKeyValueStore.default.set(true, forKey: kneeRecoveryKey)
+            NSUbiquitousKeyValueStore.default.synchronize()
+        }
+    }
+
+    /// Spec de un día de la etapa de recuperación de rodilla.
+    private struct KneeDay {
+        let month: Int
+        let day: Int
+        let type: WorkoutType
+        let title: String
+        let detail: String
+    }
+
+    /// Plan del 24/6 al 5/7/2026: prioriza descanso sin impacto y un trote de
+    /// prueba antes de decidir la carrera. Sin fondos, sin pierna pesada ni saltos.
+    private static let kneeRecoveryDays: [KneeDay] = [
+        KneeDay(month: 6, day: 24, type: .descanso, title: "Descanso de rodilla + movilidad",
+                detail: "Movilidad, elongación de gemelo/sóleo y protocolo de Alfredson. Caminar normal sí; no correr ni testear la rodilla a propósito."),
+        KneeDay(month: 6, day: 25, type: .fuerza, title: "Fuerza · Día 2 (tren superior + core)",
+                detail: "Sin pierna pesada ni saltos. Sumar Alfredson."),
+        KneeDay(month: 6, day: 26, type: .descanso, title: "Descanso / movilidad",
+                detail: "Movilidad y Alfredson."),
+        KneeDay(month: 6, day: 27, type: .descanso, title: "Descanso",
+                detail: "Que la rodilla llegue fresca al trote de prueba. Movilidad ligera opcional."),
+        KneeDay(month: 6, day: 28, type: .calidad, title: "Trote de PRUEBA (decisión rodilla)",
+                detail: "15-20 min muy suave (Zona 2), en llano. Llevar el donut en el dedo. Es el test que define si la rodilla está para la carrera: si no duele corriendo ni al día siguiente, buena señal; si duele, cambia la pisada o aparece al otro día, no correr."),
+        KneeDay(month: 6, day: 29, type: .descanso, title: "Descanso (evaluar rodilla)",
+                detail: "Clave: cómo respondió la rodilla al trote de ayer. Sin dolor = seguimos. Con dolor = replantear la carrera."),
+        KneeDay(month: 6, day: 30, type: .fuerza, title: "Fuerza liviana (tren superior)",
+                detail: "Mitad de series, sin pierna ni saltos. Solo si la rodilla viene bien."),
+        KneeDay(month: 7, day: 1, type: .rodaje, title: "Trote suave 4-5 km (condicional)",
+                detail: "Solo si el trote del domingo salió sin dolor. Muy suave, Zona 2. Si la rodilla protesta, descanso."),
+        KneeDay(month: 7, day: 2, type: .calidad, title: "Trote suave 15 min + unos pocos cambios de ritmo (condicional)",
+                detail: "Solo si todo viene sin dolor. Nada exigente. Última activación antes de la carrera."),
+        KneeDay(month: 7, day: 3, type: .descanso, title: "Descanso",
+                detail: "Movilidad ligera."),
+        KneeDay(month: 7, day: 4, type: .descanso, title: "Descanso total (víspera)",
+                detail: "Hidratar, cargar hidratos, preparar todo: donut, vendaje, ropa."),
+        KneeDay(month: 7, day: 5, type: .carrera, title: "Media Maratón Córdoba 21,1 km",
+                detail: "Correr SOLO si la rodilla respondió bien a las pruebas. Si hay dolor que cambia la pisada, parar. La salud vale más que terminar."),
+    ]
+
+    /// Reescribe los días del 24/6 al 5/7/2026 con el plan de recuperación de
+    /// rodilla, **sin tocar fechas anteriores al 24/6**. Reemplaza tipo, título,
+    /// detalle, descripción y ejercicios (fuerza → rutina sin pierna/salto; el
+    /// resto sin gimnasio) y limpia el registro previo (son días futuros). Corre
+    /// una sola vez y **solo en el iPhone** (las altas/bajas de ejercicios no son
+    /// idempotentes entre dispositivos; las eliminaciones se propagan por CloudKit).
+    static func applyKneeRecoveryIfNeeded(context: ModelContext) {
+        guard !kneeRecoveryApplied else { return }
+        guard let allDays = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
+
+        let cal = PlanConstants.calendar
+        let byDate = Dictionary(grouping: allDays) { cal.startOfDay(for: $0.date) }
+
+        for spec in kneeRecoveryDays {
+            let date = cal.startOfDay(for: DateComponents.makeDate(year: 2026, month: spec.month, day: spec.day))
+            guard let días = byDate[date] else { continue }
+            for day in días {
+                day.type = spec.type
+                day.title = spec.title
+                day.detail = spec.detail
+                day.longDescription = spec.detail
+                // Son días futuros y el contenido cambió: se limpia el registro.
+                day.isCompleted = false
+                day.actualKm = nil
+                day.durationMinutes = nil
+                day.perceivedEffort = nil
+                day.notes = nil
+                day.avgHeartRate = nil
+                day.activeCalories = nil
+
+                if spec.type == .fuerza {
+                    let light = spec.title.localizedCaseInsensitiveContains("liviana")
+                    StrengthSeed.applyKneeRecoveryRoutine(to: day, light: light, context: context)
+                } else {
+                    for exercise in day.orderedExercises { context.delete(exercise) }
+                }
+            }
+        }
+
+        try? context.save()
+        markKneeRecoveryApplied()
     }
 }
