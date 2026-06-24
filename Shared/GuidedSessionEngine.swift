@@ -39,13 +39,17 @@ final class GuidedSessionEngine {
     private(set) var index = 0
     private(set) var phase: GuidedSessionPhase = .logging
 
+    /// Identifica la sesión en vivo actual (para el sync con el iPhone). El
+    /// reloj la renueva al empezar cada sesión con `beginLiveSession()`.
+    private(set) var sessionID = UUID()
+
     // Cronómetro de descanso.
     private(set) var restTotal = 0
     private(set) var restRemaining = 0
     /// Segundos transcurridos una vez que el descanso llegó a 0 (tiempo extra).
     /// Sigue contando hacia arriba hasta que el usuario confirma la próxima serie.
     private(set) var restOvertime = 0
-    private var restEndDate: Date?
+    private(set) var restEndDate: Date?
     /// Próximo segundo de tiempo extra en el que volver a avisar (vibrar).
     private var nextOvertimeAlert = 0
     /// Cada cuántos segundos de tiempo extra se repite el aviso.
@@ -67,6 +71,12 @@ final class GuidedSessionEngine {
     /// Se llama exactamente cuando la cuenta regresiva llega a 0: la plataforma
     /// dispara su aviso (vibración en la muñeca / sonido + háptica en iPhone).
     var onRestAlert: (() -> Void)?
+
+    /// Se llama tras cada cambio de estado relevante (avance de serie, descanso,
+    /// fin). El reloj lo usa para difundir un `LiveSessionSnapshot` al iPhone.
+    /// No se dispara en cada tick del cronómetro: la cuenta regresiva la dibuja
+    /// cada cliente con `restEndDate`, así no inundamos el canal.
+    var onStateChanged: (() -> Void)?
 
     private var day: WorkoutDay?
     private var context: ModelContext?
@@ -167,6 +177,7 @@ final class GuidedSessionEngine {
         } else {
             advance()
         }
+        onStateChanged?()
     }
 
     private func advance() {
@@ -183,6 +194,7 @@ final class GuidedSessionEngine {
         phase = .logging
         currentStep?.set?.isDone = false
         save()
+        onStateChanged?()
     }
 
     /// Desde el descanso, vuelve a la serie recién cargada para corregirla.
@@ -190,6 +202,7 @@ final class GuidedSessionEngine {
         onRestEnded?()
         restEndDate = nil
         phase = .logging
+        onStateChanged?()
     }
 
     private func finish() {
@@ -223,12 +236,16 @@ final class GuidedSessionEngine {
             restOvertime = 0
             return
         }
+        // Transición a "tiempo extra": un único snapshot para que el iPhone
+        // pinte el descanso en rojo (la cuenta sigue corriendo sola por fecha).
+        let enteringOvertime = restRemaining > 0
         restRemaining = 0
         restOvertime = Int((-remaining).rounded(.down))
         if restOvertime >= nextOvertimeAlert {
             onRestAlert?()
             nextOvertimeAlert += overtimeAlertInterval
         }
+        if enteringOvertime { onStateChanged?() }
     }
 
     /// Confirma que se empieza la próxima serie: corta el descanso (o el tiempo
@@ -236,6 +253,7 @@ final class GuidedSessionEngine {
     func skipRest() {
         onRestEnded?()
         advance()
+        onStateChanged?()
     }
 
     /// Ajusta el descanso (±segundos), tanto la cuenta en curso como el valor
@@ -253,6 +271,7 @@ final class GuidedSessionEngine {
         save()
 
         onRestStarted?(newRemaining)
+        onStateChanged?()
     }
 
     /// Fracción del anillo de descanso (0…1).
@@ -297,5 +316,90 @@ final class GuidedSessionEngine {
 
     private func save() {
         try? context?.save()
+    }
+
+    // MARK: - Sesión en vivo (sync reloj ↔ iPhone)
+
+    /// Renueva el id de sesión al empezar (el reloj lo llama al arrancar la
+    /// sesión guiada, antes de difundir el primer snapshot).
+    func beginLiveSession() {
+        sessionID = UUID()
+    }
+
+    /// Fase actual en el tipo Codable que viaja por el canal en vivo.
+    var livePhase: LiveSessionPhase {
+        switch phase {
+        case .logging: return .logging
+        case .resting: return .resting
+        case .done:    return .done
+        }
+    }
+
+    /// Arma la foto del estado actual para difundir al iPhone. El pulso lo
+    /// inyecta la plataforma (el engine no conoce HealthKit).
+    func makeSnapshot(heartRate: Int? = nil) -> LiveSessionSnapshot {
+        let step = currentStep
+        let exercise = step?.exercise
+
+        let bodyweight: Bool = exercise.map { !$0.tracksWeight } ?? false
+        let timeBased: Bool = exercise?.isTimeBased ?? false
+        let restEnd: Date? = (phase == .resting) ? restEndDate : nil
+        let dayDate: Date = day?.date ?? Date()
+
+        let snapshot = LiveSessionSnapshot(
+            sessionID: sessionID,
+            dayDate: dayDate,
+            phase: livePhase,
+            exerciseName: exercise?.name ?? "",
+            exerciseIndex: step?.exerciseIndex ?? 0,
+            exerciseCount: step?.exerciseCount ?? exerciseCount,
+            setNumber: step?.setNumber ?? 0,
+            setCount: step?.setCount ?? 0,
+            targetReps: exercise?.targetReps,
+            isBodyweight: bodyweight,
+            isTimeBased: timeBased,
+            weight: step?.set?.weight,
+            reps: step?.set?.reps,
+            restEndDate: restEnd,
+            restTotal: restTotal,
+            isOvertime: isRestOvertime,
+            heartRate: heartRate,
+            progressFraction: progressFraction,
+            loggedSetsCount: loggedSetsCount,
+            totalVolume: totalVolume,
+            updatedAt: Date()
+        )
+        return snapshot
+    }
+
+    /// Aplica un comando remoto recibido del iPhone. Ignora los de otra sesión.
+    /// Cada acción dispara `onStateChanged` por dentro, así que el reloj re-emite
+    /// el snapshot automáticamente.
+    func apply(_ command: LiveSessionCommand) {
+        guard command.sessionID == sessionID else { return }
+        switch command.action {
+        case .completeCurrent:
+            if phase == .logging { completeCurrent() }
+        case .skipRest:
+            if phase == .resting { skipRest() }
+        case .goBack:
+            if phase == .resting { goBackFromResting() }
+            else if index > 0 { goBackFromLogging() }
+        case .adjustRest(let delta):
+            adjustRest(by: delta)
+        case .end:
+            endSession()
+        }
+    }
+
+    /// Termina la sesión a distancia (botón de cerrar desde el iPhone). No marca
+    /// todas las series: solo cierra la sesión en curso.
+    private func endSession() {
+        guard phase != .done else { return }
+        onRestEnded?()
+        restEndDate = nil
+        phase = .done
+        save()
+        onStateChanged?()
     }
 }

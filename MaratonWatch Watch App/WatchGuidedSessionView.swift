@@ -21,6 +21,10 @@ struct WatchGuidedSessionView: View {
 
     @State private var engine: GuidedSessionEngine
     @State private var workout = WatchWorkoutManager()
+    @State private var link = LiveSessionConnectivity.shared
+    /// Último instante en que se difundió un snapshot (para limitar los refrescos
+    /// de pulso a ~3 s mientras el iPhone está accesible).
+    @State private var lastBroadcast = Date.distantPast
 
     private let ticker = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
     private var tint: Color { WorkoutType.fuerza.color }
@@ -45,7 +49,16 @@ struct WatchGuidedSessionView: View {
         .navigationTitle("Sesión")
         .task { startSession() }
         .onDisappear(perform: stopWorkoutIfNeeded)
-        .onReceive(ticker) { engine.tickRest(now: $0) }
+        .onReceive(ticker) { now in
+            engine.tickRest(now: now)
+            // Refresca el pulso en el iPhone mientras esté accesible (sin inundar:
+            // los cambios de estado ya viajan por `onStateChanged`).
+            if engine.phase != .done,
+               link.isReachable,
+               now.timeIntervalSince(lastBroadcast) > 3 {
+                broadcast()
+            }
+        }
         .onChange(of: engine.phase) { _, newPhase in
             if newPhase == .done { saveWorkoutMetrics() }
         }
@@ -191,6 +204,22 @@ struct WatchGuidedSessionView: View {
         engine.onRestAlert = {
             WKInterfaceDevice.current().play(.notification)
         }
+
+        // Sesión en vivo: id nuevo, difusión de estado al iPhone y recepción de
+        // comandos remotos (la muñeca es la autoridad que muta los datos).
+        engine.beginLiveSession()
+        let link = self.link
+        let workout = self.workout
+        engine.onStateChanged = { [weak engine] in
+            guard let engine else { return }
+            let hr = workout.currentHeartRate
+            link.send(snapshot: engine.makeSnapshot(heartRate: hr > 0 ? hr : nil))
+        }
+        link.onCommand = { [weak engine] command in
+            engine?.apply(command)
+        }
+        link.activate()
+
         // Los pasos ya se construyeron en el init; acá solo asociamos el contexto
         // para guardar y arrancamos la sesión de entrenamiento (pulso en vivo).
         engine.attach(context: context)
@@ -198,6 +227,16 @@ struct WatchGuidedSessionView: View {
             await workout.requestAuthorization()
             workout.start()
         }
+
+        // Primer snapshot para que el iPhone arranque la Live Activity.
+        broadcast()
+    }
+
+    /// Difunde el estado actual (con el pulso en vivo) al iPhone.
+    private func broadcast() {
+        let hr = workout.currentHeartRate
+        link.send(snapshot: engine.makeSnapshot(heartRate: hr > 0 ? hr : nil))
+        lastBroadcast = Date()
     }
 
     private func saveWorkoutMetrics() {
@@ -211,7 +250,13 @@ struct WatchGuidedSessionView: View {
     }
 
     private func stopWorkoutIfNeeded() {
-        // Si se sale antes de terminar, cierra la sesión de entrenamiento.
+        // Si se sale antes de terminar, avisa al iPhone para cerrar la Live
+        // Activity (snapshot con fase .done) y cierra la sesión de entrenamiento.
+        if engine.phase != .done {
+            var ended = engine.makeSnapshot(heartRate: workout.currentHeartRate)
+            ended.phase = .done
+            link.send(snapshot: ended)
+        }
         if workout.isRunning {
             Task { await workout.end() }
         }

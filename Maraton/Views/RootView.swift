@@ -40,6 +40,8 @@ final class Navigator {
 
 struct RootView: View {
     @Environment(\.modelContext) private var context
+    @State private var link = LiveSessionConnectivity.shared
+    @State private var showingMirror = false
 
     var body: some View {
         Group {
@@ -49,7 +51,20 @@ struct RootView: View {
             TabRootView()
             #endif
         }
+        .safeAreaInset(edge: .top) {
+            if let snapshot = link.latestSnapshot, snapshot.isActive {
+                LiveSessionBanner(snapshot: snapshot) { showingMirror = true }
+                    .padding(.top, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: link.hasActiveSession)
+        .sheet(isPresented: $showingMirror) {
+            LiveSessionMirrorView()
+        }
         .task {
+            // Canal en vivo con el Apple Watch (banner + espejo de la sesión).
+            link.activate()
             // Reprograma los recordatorios activos (p. ej. tras reinstalar).
             if let reminders = try? context.fetch(FetchDescriptor<SupplementReminder>()) {
                 NotificationManager.shared.rescheduleAll(reminders)
