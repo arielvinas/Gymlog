@@ -25,9 +25,14 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
   los ejercicios de salto** (paracaidista / step a una pierna). Migraciones
   puntuales de `WorkoutSeed` (cada una corre 1 vez, con su clave en UserDefaults):
   `applyThursdayGymSwapIfNeeded` (semana del 4-5/6/2026: jueves a gimnasio Fuerza B,
-  calidad al viernes) y **`applyNewStructureIfNeeded`** (pone los días del **8/6 en
+  calidad al viernes), **`applyNewStructureIfNeeded`** (pone los días del **8/6 en
   adelante** con la estructura/calidades nuevas, sin tocar nada ≤ 7/6; preserva
-  progreso y no cambia tipos).
+  progreso y no cambia tipos) y **`applyKneeRecoveryIfNeeded`** (etapa de
+  recuperación de rodilla **24/6→5/7/2026**: reescribe esos 12 días —sin fondos, sin
+  pierna pesada ni saltos, con trote de prueba el 28/6 y carrera condicional el 5/7—,
+  sin tocar fechas < 24/6; los días de fuerza usan `StrengthSeed.kneeRecoveryRoutine`
+  = Día B sin pierna/salto/equilibrio). **Corre solo en el iPhone** y se propaga por
+  CloudKit (ver nota de duplicados abajo).
 - **Carga de series por rueda (estilo alarma), sin teclado:** en `GymSessionView`
   (`SetRow`) y `GuidedGymSessionView` (`LoggingCard`) el peso/reps/segundos se
   eligen tocando un chip que abre una hoja con ruedas (`WeightWheelField` —kg +
@@ -294,6 +299,22 @@ completa a la Mac. Se activó al pasar la cuenta `<TU-APPLE-ID>` al
 entitlements; queda **pendiente** sólo redesplegar la build nueva cuando el device
 esté disponible. Para revertir: `AppData.iCloudSyncEnabled = false` (vuelve a store
 local en todos los dispositivos).
+
+**✅ Reloj sincronizando (23/6/2026).** Confirmado que CloudKit funciona también en
+el reloj (misma cuenta iCloud). Se arregló un bug de **días duplicados**: el
+`ubiquity-kvstore-identifier` usaba `$(CFBundleIdentifier)`, que expandía distinto
+por app (iPhone `…ariel.Maraton` vs reloj `…ariel.Maraton.watchkitapp`); como el flag
+"ya sembré" vive en ese KVS, el reloj no veía el del iPhone y **sembraba su propia
+copia** del plan → dos registros por fecha. **Fix de raíz:** el reloj usa el **mismo**
+KVS identifier que el iPhone (`$(TeamIdentifierPrefix)ariel.Maraton`, hardcodeado).
+**Limpieza:** `WorkoutSeed.deduplicateDays` agrupa por fecha y conserva el registro
+más rico (completado/con datos), borra los vacíos; determinístico e idempotente,
+**corre solo en el iPhone** (un único limpiador evita carreras; las bajas se
+propagan por CloudKit). **Regla general:** todo lo que cree/borre registros como
+parte de una migración debe correr en **un solo dispositivo** (guardar con
+`#if os(iOS) && !targetEnvironment(macCatalyst)`); modificar campos escalares sí es
+seguro en todos (last-writer-wins). Apps/extensiones que compartan KVS entre iPhone
+y reloj deben declarar el **mismo** identifier hardcodeado, no `$(CFBundleIdentifier)`.
 
 ### Qué se tocó para activarlo (todo ya aplicado)
 1. **Entitlements** iOS (`Maraton.entitlements`), Mac Catalyst (`Maraton-Catalyst.entitlements`)
