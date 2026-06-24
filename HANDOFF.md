@@ -41,6 +41,11 @@ light/dark. Target del proyecto: `Maraton` (bundle `ariel.Maraton`).
   (`ExerciseHistory.lastWeight`, el más pesado de la última sesión). Solo completa
   lo vacío (nunca pisa lo cargado). Así se editan las reps solo si no se llegan y
   el peso una vez (o al subir). Vale para reloj + iPhone guiado + Live Activity.
+- **Cambiar el próximo ejercicio (sesión guiada):** botón "Cambiar ejercicio" (en
+  carga y descanso, reloj e iPhone) que abre la lista de pendientes; el elegido
+  pasa a ser el próximo (`GuidedSessionEngine.bringExerciseNext` reordena los
+  `Exercise.order` y preserva la posición y lo registrado). Para cuando la máquina
+  del que seguía está ocupada y se intercala otro del plan.
 - Dashboard en 3 tabs: **Detalle** (vista de un día del plan, deslizable entre
   todos los días o saltando desde la tira de la semana; muestra qué toca, datos de
   la semana de ese día, última corrida y suplementos del día —permite marcar
