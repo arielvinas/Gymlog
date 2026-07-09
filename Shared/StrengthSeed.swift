@@ -155,38 +155,6 @@ enum StrengthSeed {
             }
     }
 
-    // MARK: - Etapa de recuperación de rodilla (sin pierna / salto / equilibrio)
-
-    /// Ejercicios de pierna, salto o equilibrio que se omiten cuando hay una
-    /// molestia de rodilla en recuperación (quedan core + hombros + pecho + remo
-    /// + brazos).
-    static let kneeExcludedNames: Set<String> = [
-        "Equilibrio a un pie sobre bosu",
-        "Salto sobre step a una pierna",
-        "Peso muerto a una pierna con pesa rusa",
-        "Aductores en máquina",
-        "Extensión de rodillas en máquina",
-        "Flexión de rodillas acostado",
-    ]
-
-    /// Rutina de fuerza para la etapa de rodilla: el Día B sin pierna, salto ni
-    /// equilibrio. `light` reduce las series a la mitad (fuerza liviana de víspera).
-    static func kneeRecoveryRoutine(light: Bool) -> [ExerciseTemplate] {
-        let base = dayB.filter { !kneeExcludedNames.contains($0.name) }
-        guard light else { return base }
-        return base.map { t in
-            let reduced = t.sets == 0 ? 0 : max(1, (t.sets + 1) / 2)
-            let note = t.sets == 0 ? t.note : "Liviana · mitad de series, carga cómoda"
-            return ExerciseTemplate(name: t.name, sets: reduced, reps: t.reps, note: note, rest: t.rest, imageName: t.imageName)
-        }
-    }
-
-    /// Reemplaza los ejercicios de un día por la rutina de recuperación de rodilla.
-    static func applyKneeRecoveryRoutine(to day: WorkoutDay, light: Bool, context: ModelContext) {
-        for exercise in day.orderedExercises { context.delete(exercise) }
-        insert(kneeRecoveryRoutine(light: light), into: day, context: context)
-    }
-
     /// Rango de reps objetivo del template (nil para core, que no lleva carga).
     private static func target(for t: ExerciseTemplate) -> String? {
         t.reps.isEmpty ? nil : t.reps

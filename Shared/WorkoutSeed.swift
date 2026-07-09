@@ -267,222 +267,53 @@ enum WorkoutSeed {
         return score
     }
 
-    // MARK: - Ajuste puntual semana 1 (jueves gimnasio / viernes calidad)
+    // MARK: - Limpieza de la etapa de recuperación de rodilla (24/6 → 5/7/2026)
 
-    private static let thursdaySwapKey = "appliedThursdayGymSwapV1"
+    private static let kneeCleanupKey = "cleanedKneeRecoveryV1"
 
-    private static var thursdaySwapApplied: Bool {
-        let local = UserDefaults.standard.bool(forKey: thursdaySwapKey)
+    private static var kneeCleanupApplied: Bool {
+        let local = UserDefaults.standard.bool(forKey: kneeCleanupKey)
         guard AppData.iCloudSyncEnabled else { return local }
-        return local || NSUbiquitousKeyValueStore.default.bool(forKey: thursdaySwapKey)
+        return local || NSUbiquitousKeyValueStore.default.bool(forKey: kneeCleanupKey)
     }
 
-    private static func markThursdaySwapApplied() {
-        UserDefaults.standard.set(true, forKey: thursdaySwapKey)
+    private static func markKneeCleanupApplied() {
+        UserDefaults.standard.set(true, forKey: kneeCleanupKey)
         if AppData.iCloudSyncEnabled {
-            NSUbiquitousKeyValueStore.default.set(true, forKey: thursdaySwapKey)
+            NSUbiquitousKeyValueStore.default.set(true, forKey: kneeCleanupKey)
             NSUbiquitousKeyValueStore.default.synchronize()
         }
     }
 
-    /// Intercambia el jueves 4/6 y el viernes 5/6 en instalaciones ya sembradas:
-    /// el jueves pasa a ser el día de fuerza (gimnasio, nueva rutina de Fuerza B)
-    /// y la corrida de calidad se mueve al viernes. Los ejercicios del jueves los
-    /// siembra después `StrengthSeed.populateIfNeeded`. Corre una sola vez y sólo
-    /// si los días siguen como los dejó el plan original (no pisa ediciones).
-    static func applyThursdayGymSwapIfNeeded(context: ModelContext) {
-        guard !thursdaySwapApplied else { return }
-
-        let cal = PlanConstants.calendar
-        let jueves = DateComponents.makeDate(year: 2026, month: 6, day: 4)
-        let viernes = DateComponents.makeDate(year: 2026, month: 6, day: 5)
-
-        guard let days = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
-
-        // Jueves: de corrida de calidad a día de fuerza (gimnasio).
-        if let thu = days.first(where: { cal.isDate($0.date, inSameDayAs: jueves) }), thu.type == .calidad {
-            thu.type = .fuerza
-            thu.title = "Fuerza B"
-            thu.detail = "Espalda + tríceps + core"
-            thu.longDescription = longDescription(for: .fuerza, title: thu.title)
-            thu.isCompleted = false
-            // Limpia campos de corrida que ya no aplican.
-            thu.actualKm = nil
-            thu.durationMinutes = nil
-            thu.perceivedEffort = nil
-            thu.avgHeartRate = nil
-            thu.activeCalories = nil
-        }
-
-        // Viernes: de día de fuerza a corrida de calidad. Si no hay nada
-        // registrado en el gimnasio, se quitan los ejercicios sobrantes.
-        if let fri = days.first(where: { cal.isDate($0.date, inSameDayAs: viernes) }), fri.type == .fuerza {
-            if !fri.orderedExercises.contains(where: { $0.hasLoggedData }) {
-                for exercise in fri.orderedExercises { context.delete(exercise) }
-            }
-            fri.type = .calidad
-            fri.title = "Calidad · 2×10' tempo"
-            fri.detail = "(7/10), 3' trote"
-            fri.longDescription = longDescription(for: .calidad, title: fri.title)
-            fri.isCompleted = false
-        }
-
-        try? context.save()
-        markThursdaySwapApplied()
-    }
-
-    // MARK: - Estructura nueva del 8/6 en adelante
-
-    private static let newStructureKey = "appliedNewStructureV1"
-
-    /// Primer día que toca la actualización de estructura. Todo lo igual o
-    /// anterior al 7/6 queda intacto.
-    private static let newStructureCutoff = DateComponents.makeDate(year: 2026, month: 6, day: 8)
-
-    private static var newStructureApplied: Bool {
-        let local = UserDefaults.standard.bool(forKey: newStructureKey)
-        guard AppData.iCloudSyncEnabled else { return local }
-        return local || NSUbiquitousKeyValueStore.default.bool(forKey: newStructureKey)
-    }
-
-    private static func markNewStructureApplied() {
-        UserDefaults.standard.set(true, forKey: newStructureKey)
-        if AppData.iCloudSyncEnabled {
-            NSUbiquitousKeyValueStore.default.set(true, forKey: newStructureKey)
-            NSUbiquitousKeyValueStore.default.synchronize()
-        }
-    }
-
-    /// Pone los días del 8/6 en adelante al día con la estructura canónica nueva
-    /// (calidades con su prescripción, notas de fondo, semana de pico/taper). No
-    /// toca ninguna fecha igual o anterior al 7/6. Corre una sola vez. Como esos
-    /// días son futuros, reescribe los campos descriptivos; preserva el progreso
-    /// (`isCompleted`, métricas y ejercicios) y no cambia el tipo de ningún día.
-    static func applyNewStructureIfNeeded(context: ModelContext) {
-        guard !newStructureApplied else { return }
-
-        let cal = PlanConstants.calendar
-        let cutoff = cal.startOfDay(for: newStructureCutoff)
-
-        guard let existentes = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
-        let porFecha = Dictionary(existentes.map { (cal.startOfDay(for: $0.date), $0) },
-                                  uniquingKeysWith: { a, _ in a })
-
-        for canonical in allWorkoutDays() where cal.startOfDay(for: canonical.date) >= cutoff {
-            let key = cal.startOfDay(for: canonical.date)
-            if let dia = porFecha[key] {
-                dia.title = canonical.title
-                dia.detail = canonical.detail
-                dia.longDescription = canonical.longDescription
-                dia.type = canonical.type
-                dia.weekTitle = canonical.weekTitle
-                dia.weekTag = canonical.weekTag
-                dia.weekOrder = canonical.weekOrder
-            } else {
-                context.insert(canonical)
-            }
-        }
-
-        try? context.save()
-        markNewStructureApplied()
-    }
-
-    // MARK: - Etapa de recuperación de rodilla (24/6 → 5/7/2026)
-
-    private static let kneeRecoveryKey = "appliedKneeRecoveryV1"
-
-    private static var kneeRecoveryApplied: Bool {
-        let local = UserDefaults.standard.bool(forKey: kneeRecoveryKey)
-        guard AppData.iCloudSyncEnabled else { return local }
-        return local || NSUbiquitousKeyValueStore.default.bool(forKey: kneeRecoveryKey)
-    }
-
-    private static func markKneeRecoveryApplied() {
-        UserDefaults.standard.set(true, forKey: kneeRecoveryKey)
-        if AppData.iCloudSyncEnabled {
-            NSUbiquitousKeyValueStore.default.set(true, forKey: kneeRecoveryKey)
-            NSUbiquitousKeyValueStore.default.synchronize()
-        }
-    }
-
-    /// Spec de un día de la etapa de recuperación de rodilla.
-    private struct KneeDay {
-        let month: Int
-        let day: Int
-        let type: WorkoutType
-        let title: String
-        let detail: String
-    }
-
-    /// Plan del 24/6 al 5/7/2026: prioriza descanso sin impacto y un trote de
-    /// prueba antes de decidir la carrera. Sin fondos, sin pierna pesada ni saltos.
-    private static let kneeRecoveryDays: [KneeDay] = [
-        KneeDay(month: 6, day: 24, type: .descanso, title: "Descanso de rodilla + movilidad",
-                detail: "Movilidad, elongación de gemelo/sóleo y protocolo de Alfredson. Caminar normal sí; no correr ni testear la rodilla a propósito."),
-        KneeDay(month: 6, day: 25, type: .fuerza, title: "Fuerza · Día 2 (tren superior + core)",
-                detail: "Sin pierna pesada ni saltos. Sumar Alfredson."),
-        KneeDay(month: 6, day: 26, type: .descanso, title: "Descanso / movilidad",
-                detail: "Movilidad y Alfredson."),
-        KneeDay(month: 6, day: 27, type: .descanso, title: "Descanso",
-                detail: "Que la rodilla llegue fresca al trote de prueba. Movilidad ligera opcional."),
-        KneeDay(month: 6, day: 28, type: .calidad, title: "Trote de PRUEBA (decisión rodilla)",
-                detail: "15-20 min muy suave (Zona 2), en llano. Llevar el donut en el dedo. Es el test que define si la rodilla está para la carrera: si no duele corriendo ni al día siguiente, buena señal; si duele, cambia la pisada o aparece al otro día, no correr."),
-        KneeDay(month: 6, day: 29, type: .descanso, title: "Descanso (evaluar rodilla)",
-                detail: "Clave: cómo respondió la rodilla al trote de ayer. Sin dolor = seguimos. Con dolor = replantear la carrera."),
-        KneeDay(month: 6, day: 30, type: .fuerza, title: "Fuerza liviana (tren superior)",
-                detail: "Mitad de series, sin pierna ni saltos. Solo si la rodilla viene bien."),
-        KneeDay(month: 7, day: 1, type: .rodaje, title: "Trote suave 4-5 km (condicional)",
-                detail: "Solo si el trote del domingo salió sin dolor. Muy suave, Zona 2. Si la rodilla protesta, descanso."),
-        KneeDay(month: 7, day: 2, type: .calidad, title: "Trote suave 15 min + unos pocos cambios de ritmo (condicional)",
-                detail: "Solo si todo viene sin dolor. Nada exigente. Última activación antes de la carrera."),
-        KneeDay(month: 7, day: 3, type: .descanso, title: "Descanso",
-                detail: "Movilidad ligera."),
-        KneeDay(month: 7, day: 4, type: .descanso, title: "Descanso total (víspera)",
-                detail: "Hidratar, cargar hidratos, preparar todo: donut, vendaje, ropa."),
-        KneeDay(month: 7, day: 5, type: .carrera, title: "Media Maratón Córdoba 21,1 km",
-                detail: "Correr SOLO si la rodilla respondió bien a las pruebas. Si hay dolor que cambia la pisada, parar. La salud vale más que terminar."),
+    /// Fechas que ocupó la etapa de recuperación de rodilla.
+    private static let kneeRecoveryDates: [(month: Int, day: Int)] = [
+        (6, 24), (6, 25), (6, 26), (6, 27), (6, 28), (6, 29), (6, 30),
+        (7, 1), (7, 2), (7, 3), (7, 4), (7, 5),
     ]
 
-    /// Reescribe los días del 24/6 al 5/7/2026 con el plan de recuperación de
-    /// rodilla, **sin tocar fechas anteriores al 24/6**. Reemplaza tipo, título,
-    /// detalle, descripción y ejercicios (fuerza → rutina sin pierna/salto; el
-    /// resto sin gimnasio) y limpia el registro previo (son días futuros). Corre
-    /// una sola vez y **solo en el iPhone** (las altas/bajas de ejercicios no son
-    /// idempotentes entre dispositivos; las eliminaciones se propagan por CloudKit).
-    static func applyKneeRecoveryIfNeeded(context: ModelContext) {
-        guard !kneeRecoveryApplied else { return }
-        guard let allDays = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
+    /// Borra los días de la etapa de recuperación de rodilla que quedaron **vacíos**:
+    /// sin completar, sin métricas de corrida y sin series cargadas. Los días donde
+    /// sí hubo entrenamiento —incluida la carrera del 5/7— se conservan como
+    /// historial. Reutiliza el puntaje `richness` de la deduplicación: 0 significa
+    /// que no hay ningún dato del usuario en ese día.
+    ///
+    /// Corre una sola vez y **solo en el iPhone**: los borrados se propagan por
+    /// CloudKit al reloj y a la Mac.
+    static func cleanupKneeRecoveryIfNeeded(context: ModelContext) {
+        guard !kneeCleanupApplied else { return }
+        guard let all = try? context.fetch(FetchDescriptor<WorkoutDay>()) else { return }
 
         let cal = PlanConstants.calendar
-        let byDate = Dictionary(grouping: allDays) { cal.startOfDay(for: $0.date) }
+        let objetivo = Set(kneeRecoveryDates.map {
+            cal.startOfDay(for: DateComponents.makeDate(year: 2026, month: $0.month, day: $0.day))
+        })
 
-        for spec in kneeRecoveryDays {
-            let date = cal.startOfDay(for: DateComponents.makeDate(year: 2026, month: spec.month, day: spec.day))
-            guard let días = byDate[date] else { continue }
-            for day in días {
-                day.type = spec.type
-                day.title = spec.title
-                day.detail = spec.detail
-                day.longDescription = spec.detail
-                // Son días futuros y el contenido cambió: se limpia el registro.
-                day.isCompleted = false
-                day.actualKm = nil
-                day.durationMinutes = nil
-                day.perceivedEffort = nil
-                day.notes = nil
-                day.avgHeartRate = nil
-                day.activeCalories = nil
-
-                if spec.type == .fuerza {
-                    let light = spec.title.localizedCaseInsensitiveContains("liviana")
-                    StrengthSeed.applyKneeRecoveryRoutine(to: day, light: light, context: context)
-                } else {
-                    for exercise in day.orderedExercises { context.delete(exercise) }
-                }
-            }
+        var borré = false
+        for day in all where objetivo.contains(cal.startOfDay(for: day.date)) && richness(day) == 0 {
+            context.delete(day)
+            borré = true
         }
-
-        try? context.save()
-        markKneeRecoveryApplied()
+        if borré { try? context.save() }
+        markKneeCleanupApplied()
     }
 }
