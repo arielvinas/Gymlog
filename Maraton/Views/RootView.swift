@@ -123,7 +123,7 @@ private struct SidebarRootView: View {
                     )
                 }
             }
-            .navigationTitle("Maratón")
+            .navigationTitle("GymLog")
         } detail: {
             switch navigator.section {
             case .hoy:      DayDetailView()

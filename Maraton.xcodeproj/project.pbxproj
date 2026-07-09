@@ -466,8 +466,9 @@
 				DEVELOPMENT_TEAM = 96B9D6W2NW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = GymLog;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Maratón lee tus entrenamientos y métricas de Apple Salud (distancia, frecuencia cardíaca, calorías, FC en reposo, variabilidad, VO2 máx, peso y sueño) para autocompletar tus corridas y armar tu reporte de progreso.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "GymLog lee tus entrenamientos y métricas de Apple Salud (distancia, frecuencia cardíaca, calorías, FC en reposo, variabilidad, VO2 máx, peso y sueño) para autocompletar tus corridas y armar tu reporte de progreso.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -506,8 +507,9 @@
 				DEVELOPMENT_TEAM = 96B9D6W2NW;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = GymLog;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Maratón lee tus entrenamientos y métricas de Apple Salud (distancia, frecuencia cardíaca, calorías, FC en reposo, variabilidad, VO2 máx, peso y sueño) para autocompletar tus corridas y armar tu reporte de progreso.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "GymLog lee tus entrenamientos y métricas de Apple Salud (distancia, frecuencia cardíaca, calorías, FC en reposo, variabilidad, VO2 máx, peso y sueño) para autocompletar tus corridas y armar tu reporte de progreso.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -605,7 +607,7 @@
 				DEVELOPMENT_TEAM = 96B9D6W2NW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "MaratonLiveActivity/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Maratón";
+				INFOPLIST_KEY_CFBundleDisplayName = GymLog;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -637,7 +639,7 @@
 				DEVELOPMENT_TEAM = 96B9D6W2NW;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "MaratonLiveActivity/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Maratón";
+				INFOPLIST_KEY_CFBundleDisplayName = GymLog;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.5;
 				LD_RUNPATH_SEARCH_PATHS = (

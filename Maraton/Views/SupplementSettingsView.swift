@@ -30,7 +30,7 @@ struct SupplementSettingsView: View {
         .alert("Notificaciones desactivadas", isPresented: $showAuthDenied) {
             Button("Entendido", role: .cancel) {}
         } message: {
-            Text("Activá las notificaciones de Maratón desde Ajustes para recibir los recordatorios.")
+            Text("Activá las notificaciones de GymLog desde Ajustes para recibir los recordatorios.")
         }
     }
 }

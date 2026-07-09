@@ -33,7 +33,7 @@ struct WatchTodayView: View {
     }
 
     private var navTitle: String {
-        guard days.indices.contains(selection) else { return "Maratón" }
+        guard days.indices.contains(selection) else { return "GymLog" }
         return Calendar.current.isDateInToday(days[selection].date)
             ? "Hoy"
             : days[selection].date.weekdayAndDay

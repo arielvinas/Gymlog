@@ -244,7 +244,7 @@ struct ReportView: View {
     private var footer: some View {
         VStack(alignment: .leading, spacing: 2) {
             Divider().padding(.bottom, 4)
-            Text("Generado por la app Maratón · datos de Apple Salud y del plan de entrenamiento.")
+            Text("Generado por la app GymLog · datos de Apple Salud y del plan de entrenamiento.")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
