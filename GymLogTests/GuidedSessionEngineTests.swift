@@ -221,4 +221,73 @@ struct GuidedSessionEngineTests {
         engine.skipRest()
         #expect(cambios == 2)
     }
+
+    // MARK: - I-03
+
+    /// Día con un ejercicio de core (sin series) intercalado entre dos con series.
+    /// El core no lleva peso ni reps: se hace y se sigue.
+    @MainActor
+    private func dayWithCoreInTheMiddle(in context: ModelContext) -> WorkoutDay {
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, in: context)
+        makeExercise("Press banca", on: day, order: 0, restSeconds: 90,
+                     sets: [(nil, nil)], in: context)
+        makeExercise("Plancha", on: day, order: 1, restSeconds: 90,
+                     sets: [], in: context)
+        makeExercise("Remo", on: day, order: 2, restSeconds: 60,
+                     sets: [(nil, nil)], in: context)
+        return day
+    }
+
+    @Test("I-03 · El core no abre descanso: se completa y sigue de largo")
+    func coreStepSkipsTheRest() {
+        let db = TestDB()
+        let day = dayWithCoreInTheMiddle(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var descansos = 0
+        engine.onRestStarted = { _ in descansos += 1 }
+        engine.start(day: day, context: db.context)
+
+        // Serie del press: sí descansa.
+        engine.completeCurrent()
+        #expect(engine.phase == .resting)
+        engine.skipRest()
+
+        // Ahora estamos en la plancha.
+        #expect(engine.currentStep?.exercise.name == "Plancha")
+        #expect(engine.currentStep?.set == nil)
+
+        engine.completeCurrent()
+
+        // No descansa: avanza directo al remo, sigue cargando.
+        #expect(engine.phase == .logging, "El core no debería abrir un descanso")
+        #expect(engine.currentStep?.exercise.name == "Remo")
+        #expect(descansos == 1, "El único descanso fue el del press")
+    }
+
+    @Test("I-03 · El paso de core nunca queda marcado como hecho")
+    func coreStepIsNeverMarkedDone() {
+        let db = TestDB()
+        let day = dayWithCoreInTheMiddle(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.completeCurrent()   // press
+        engine.skipRest()
+        engine.completeCurrent()   // plancha
+
+        // `completeCurrent` marca `step.set?.isDone`, y el core no tiene serie: la
+        // marca es un no-op. Suena a bug pero no lo es — `firstIncompleteIndex` solo
+        // mira pasos **con** serie, así que al retomar la sesión el core se saltea
+        // igual y no bloquea nada. Queda escrito para que nadie lo "arregle" de más.
+        let plancha = day.orderedExercises[1]
+        #expect(plancha.orderedSets.isEmpty)
+
+        let retomado = GuidedSessionEngine()
+        retomado.start(day: day, context: db.context)
+        #expect(
+            retomado.currentStep?.exercise.name == "Remo",
+            "Al retomar debería caer en el remo, no volver a la plancha"
+        )
+    }
 }

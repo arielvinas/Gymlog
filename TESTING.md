@@ -275,8 +275,11 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
 - [x] **I-02** `completeCurrent` → `.resting` con el descanso del ejercicio. En la última serie →
       `.done`. ✅ El descanso sale de **cada ejercicio** (press 90 s, remo 60 s), terminar marca el
       día como completado, y la última serie no abre un descanso que nadie va a consumir.
-- [ ] **I-03** Un paso **sin series** (core) → `completeCurrent` **saltea el descanso** y avanza
-      directo.
+- [x] **I-03** Un paso **sin series** (core) → `completeCurrent` **saltea el descanso** y avanza
+      directo. ✅ **Falsa alarma aclarada:** el paso de core nunca queda marcado como hecho
+      (`step.set?.isDone` es un no-op sin serie). Parece un bug, pero no lo es: `firstIncompleteIndex`
+      solo mira pasos **con** serie, así que al retomar la sesión el core se saltea igual y no
+      bloquea nada. Queda escrito para que nadie lo "arregle" de más.
 - [ ] **I-04** `skipRest` → `.logging` de la serie siguiente.
 - [ ] **I-05** **Regla clave:** cuando el descanso llega a cero, el engine **no avanza solo** —
       entra en tiempo extra y espera confirmación. Es la decisión de diseño más importante del
