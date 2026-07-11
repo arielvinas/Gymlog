@@ -163,7 +163,8 @@ ninguna red.
 - [x] **U-13** Round-trip con todos los opcionales en `nil`. ✅
 - [x] **U-14** Round-trip de `LiveSessionAction.adjustRest(±15)` — el caso con valor asociado, el
       más frágil ante un rename. Y cada `case` restante. ✅
-- [ ] **U-15** `LiveSessionWire.payload(for:)` → `snapshot(from:)` devuelve un snapshot igual.
+- [x] **U-15** `LiveSessionWire.payload(for:)` → `snapshot(from:)` devuelve un snapshot igual. ✅
+      (También el comando, y que cada decodificador solo entienda su propia clave.)
 - [ ] **U-16** `snapshot(from:)` con `Data` corrupta o sin la clave → `nil`. **Documenta un fallo
       silencioso**: hoy usa `try?`, así que un payload de otra versión del schema se descarta sin
       log.

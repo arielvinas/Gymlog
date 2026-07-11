@@ -146,4 +146,52 @@ struct LiveSessionStateTests {
             #expect(recovered == delta)
         }
     }
+
+    // MARK: - U-15
+
+    // `LiveSessionWire` es el formato que realmente viaja por WatchConnectivity:
+    // un `[String: Any]` con el JSON como `Data` bajo su clave. Los tests de arriba
+    // prueban el `Codable`; estos prueban el sobre que lo transporta.
+
+    @Test("U-15 · Un snapshot sobrevive el viaje por el wire")
+    func snapshotSurvivesWireRoundTrip() throws {
+        let original = fullSnapshot()
+
+        let payload = try #require(LiveSessionWire.payload(for: original))
+        let recovered = try #require(LiveSessionWire.snapshot(from: payload))
+
+        #expect(recovered == original)
+    }
+
+    @Test("U-15 · Un comando sobrevive el viaje por el wire")
+    func commandSurvivesWireRoundTrip() throws {
+        let original = LiveSessionCommand(
+            sessionID: UUID(uuidString: "3F2504E0-4F89-11D3-9A0C-0305E82C3301")!,
+            action: .adjustRest(-15),
+            sentAt: date(2026, 7, 3)
+        )
+
+        let payload = try #require(LiveSessionWire.payload(for: original))
+        let recovered = try #require(LiveSessionWire.command(from: payload))
+
+        #expect(recovered == original)
+    }
+
+    @Test("U-15 · Snapshot y comando viajan en claves distintas")
+    func snapshotAndCommandUseDistinctKeys() throws {
+        let snapshotPayload = try #require(LiveSessionWire.payload(for: fullSnapshot()))
+        let commandPayload = try #require(
+            LiveSessionWire.payload(for: LiveSessionCommand(sessionID: UUID(), action: .skipRest))
+        )
+
+        // El payload va como `Data` (JSON), no como property-list: es lo que permite
+        // mandar tipos que WCSession no sabría representar por su cuenta.
+        #expect(snapshotPayload[LiveSessionWire.snapshotKey] is Data)
+        #expect(commandPayload[LiveSessionWire.commandKey] is Data)
+
+        // Y cada decodificador solo entiende su propia clave: un comando no puede
+        // llegar disfrazado de snapshot ni al revés.
+        #expect(LiveSessionWire.snapshot(from: commandPayload) == nil)
+        #expect(LiveSessionWire.command(from: snapshotPayload) == nil)
+    }
 }
