@@ -272,8 +272,9 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       primera serie incompleta. ✅ También: el core (sin series) ocupa un paso, y `start` es
       idempotente — la vista llama `prepare` en el init y `start` en el `onAppear`, así que rearmar
       los pasos perdería el progreso de la sesión en curso.
-- [ ] **I-02** `completeCurrent` → `.resting` con el descanso del ejercicio. En la última serie →
-      `.done`.
+- [x] **I-02** `completeCurrent` → `.resting` con el descanso del ejercicio. En la última serie →
+      `.done`. ✅ El descanso sale de **cada ejercicio** (press 90 s, remo 60 s), terminar marca el
+      día como completado, y la última serie no abre un descanso que nadie va a consumir.
 - [ ] **I-03** Un paso **sin series** (core) → `completeCurrent` **saltea el descanso** y avanza
       directo.
 - [ ] **I-04** `skipRest` → `.logging` de la serie siguiente.

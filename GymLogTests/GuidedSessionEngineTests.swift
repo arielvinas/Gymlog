@@ -131,4 +131,94 @@ struct GuidedSessionEngineTests {
         // rearmar los pasos perdería el progreso de la sesión en curso.
         #expect(engine.steps.count == 5)
     }
+
+    // MARK: - I-02
+
+    @Test("I-02 · Completar una serie la marca y arranca el descanso del ejercicio")
+    func completeCurrentStartsTheRest() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var restStartedWith: [Int] = []
+        engine.onRestStarted = { restStartedWith.append($0) }
+        engine.start(day: day, context: db.context)
+
+        let primeraSerie = engine.currentStep?.set
+        engine.completeCurrent()
+
+        #expect(primeraSerie?.isDone == true)
+        #expect(engine.phase == .resting)
+
+        // El descanso sale del ejercicio, no de una constante: el press pidió 90 s.
+        #expect(engine.restTotal == 90)
+        #expect(engine.restRemaining == 90)
+        #expect(restStartedWith == [90], "La plataforma tiene que enterarse para agendar su aviso")
+
+        // Todavía no avanzó: el índice se mueve recién al salir del descanso.
+        #expect(engine.index == 0)
+    }
+
+    @Test("I-02 · Cada ejercicio impone su propio descanso")
+    func restComesFromTheCurrentExercise() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Consume las 3 series del press (90 s) hasta llegar al remo (60 s).
+        for _ in 0..<3 {
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+
+        #expect(engine.currentStep?.exercise.name == "Remo")
+        engine.completeCurrent()
+        #expect(engine.restTotal == 60)
+    }
+
+    @Test("I-02 · Completar la última serie termina la sesión")
+    func completingTheLastSetFinishesTheSession() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Las 4 primeras series pasan por descanso; la 5ª es la última.
+        for _ in 0..<4 {
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+        #expect(engine.isLastStep)
+
+        engine.completeCurrent()
+
+        #expect(engine.phase == .done)
+        #expect(day.isCompleted, "Terminar la sesión tiene que marcar el día como completado")
+        #expect(engine.progressFraction == 1)
+
+        // La última serie no abre un descanso que nadie va a consumir.
+        #expect(engine.restEndDate == nil)
+    }
+
+    @Test("I-02 · Cada transición avisa al iPhone")
+    func everyTransitionNotifiesTheMirror() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var cambios = 0
+        engine.onStateChanged = { cambios += 1 }
+        engine.start(day: day, context: db.context)
+
+        // `onStateChanged` es lo que dispara el broadcast del snapshot al iPhone y a
+        // la Live Activity: si una transición no lo emite, el espejo queda congelado.
+        engine.completeCurrent()
+        #expect(cambios == 1)
+
+        engine.skipRest()
+        #expect(cambios == 2)
+    }
 }
