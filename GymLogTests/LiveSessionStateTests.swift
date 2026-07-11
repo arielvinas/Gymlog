@@ -239,4 +239,59 @@ struct LiveSessionStateTests {
 
         #expect(LiveSessionWire.snapshot(from: [LiveSessionWire.snapshotKey: data]) == nil)
     }
+
+    // MARK: - U-17
+
+    // `LiveSessionWire` tiene el encoder y el decoder como **dos instancias
+    // separadas** (`private static let encoder` / `decoder`), las dos con la
+    // estrategia de fechas por defecto. Nada obliga a que sigan coincidiendo: si
+    // alguien le pone `.iso8601` a una sola, el reloj y el iPhone dejan de
+    // entenderse. Estos tests son el canario.
+
+    @Test("U-17 · restEndDate sobrevive el wire con precisión de subsegundo")
+    func restEndDateSurvivesWithSubsecondPrecision() throws {
+        // La fecha de fin de descanso es la que más precisión necesita: cada cliente
+        // dibuja su cuenta regresiva con `Text(timerInterval:)` a partir de ella, sin
+        // más updates. Si el round-trip la trunca, el cronómetro del iPhone y el del
+        // reloj quedan corridos.
+        let conFraccion = Date(timeIntervalSinceReferenceDate: 800_000_000.375)
+
+        var original = fullSnapshot()
+        original.restEndDate = conFraccion
+        original.updatedAt = conFraccion
+
+        let payload = try #require(LiveSessionWire.payload(for: original))
+        let recovered = try #require(LiveSessionWire.snapshot(from: payload))
+
+        #expect(recovered.restEndDate == conFraccion)
+        #expect(recovered.updatedAt == conFraccion)
+    }
+
+    @Test("U-17 · Si las estrategias de fecha se desincronizan, el snapshot no llega")
+    func mismatchedDateStrategyBreaksTheWire() throws {
+        // Simula que un lado se pasó a `.iso8601` y el otro no: es lo que pasaría si
+        // alguien "mejora" el encoder sin tocar el decoder. El snapshot no se decodifica
+        // y —por U-16— se pierde en silencio.
+        let isoEncoder = JSONEncoder()
+        isoEncoder.dateEncodingStrategy = .iso8601
+        let data = try isoEncoder.encode(fullSnapshot())
+
+        let recovered = LiveSessionWire.snapshot(from: [LiveSessionWire.snapshotKey: data])
+
+        #expect(
+            recovered == nil,
+            "El wire decodificó fechas ISO-8601: alguien cambió la estrategia de un solo lado"
+        )
+    }
+
+    @Test("U-17 · sentAt del comando también sobrevive el wire")
+    func commandSentAtSurvivesWire() throws {
+        let sentAt = Date(timeIntervalSinceReferenceDate: 800_000_000.125)
+        let original = LiveSessionCommand(sessionID: UUID(), action: .completeCurrent, sentAt: sentAt)
+
+        let payload = try #require(LiveSessionWire.payload(for: original))
+        let recovered = try #require(LiveSessionWire.command(from: payload))
+
+        #expect(recovered.sentAt == sentAt)
+    }
 }

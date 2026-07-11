@@ -172,8 +172,10 @@ ninguna red.
       sin ninguna pista**. La sesión en vivo simplemente no aparece. El comportamiento actual
       (devolver `nil` en vez de crashear) está bien; lo que falta es **logging** o una **versión en
       el payload**. Pendiente de decidir: no es un bug de corrección, es de diagnosticabilidad.
-- [ ] **U-17** Fidelidad de las `Date` en el round-trip. Blinda contra que alguien cambie la
-      estrategia de encoding de un solo lado — el encoder y el decoder son dos instancias distintas.
+- [x] **U-17** Fidelidad de las `Date` en el round-trip. Blinda contra que alguien cambie la
+      estrategia de encoding de un solo lado — el encoder y el decoder son dos instancias distintas. ✅
+      Incluye precisión de subsegundo en `restEndDate` (de la que depende el cronómetro) y un canario
+      que falla si el wire empezara a aceptar fechas ISO-8601.
 
 ### Plantillas de fuerza (`Shared/StrengthSeed.swift`)
 
