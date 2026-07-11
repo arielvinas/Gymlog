@@ -69,4 +69,55 @@ struct PlannedDistanceTests {
         // razonable: el promedio es simétrico y no hay razón para tratarlo como error.
         #expect(PlannedDistance.parse("Fondo 14-13 km") == 13.5)
     }
+
+    // MARK: - U-03
+
+    // El otro lado del contrato: **sin km, `nil`**. Es lo que evita que un día de
+    // fuerza o de descanso aporte kilómetros fantasma al volumen de la semana.
+    // Ojo con los números que NO son distancia (series, minutos, metros): el parser
+    // solo debe morder los que llevan "km" pegado.
+
+    @Test(
+        "U-03 · Un texto sin km no aporta distancia",
+        arguments: [
+            // Días que no son de correr.
+            "Descanso",
+            "Descanso / movilidad",
+            "Fuerza A",
+            "Fuerza B · Espalda + tríceps + core",
+            // Números que no son kilómetros.
+            "Series 8x400 m",
+            "Calidad · 2×10' tempo",
+            "Trote suave 15 min",
+            "Movilidad 10'",
+            // Texto vacío y unidad suelta.
+            "",
+            "km",
+            "Fondo km",
+        ]
+    )
+    func returnsNilWithoutKilometres(text: String) {
+        #expect(PlannedDistance.parse(text) == nil)
+    }
+
+    @Test("U-03 · Un día de fuerza del plan no suma km")
+    func aStrengthDayContributesNoDistance() {
+        // Lo mismo, pero entrando por donde entra de verdad: `WorkoutDay.plannedKm`
+        // concatena título + detalle, así que el test cubre la ruta real.
+        let fuerza = makeDay(
+            date(2026, 7, 1),
+            type: .fuerza,
+            title: "Fuerza A",
+            detail: "Empuje + pierna + core"
+        )
+        #expect(fuerza.plannedKm == nil)
+
+        let descanso = makeDay(
+            date(2026, 7, 2),
+            type: .descanso,
+            title: "Descanso",
+            detail: "Movilidad 10'"
+        )
+        #expect(descanso.plannedKm == nil)
+    }
 }

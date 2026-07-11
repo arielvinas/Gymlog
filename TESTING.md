@@ -138,7 +138,9 @@ La función más pura del repo y la que más casos raros tiene.
 - [x] **U-02** Rango → **promedio**: `"Fondo 13-14 km"` → `13.5`. Con en-dash (`13–14`) también. ✅
       El en-dash importa: es el que mete la sustitución automática de iOS al tipear. También con
       espacios alrededor del guion, con decimales, y un rango invertido (`14-13`) que promedia igual.
-- [ ] **U-03** Sin km → `nil`: `"Series 8x400 m"`, `"Descanso"`, `"Fuerza A"`.
+- [x] **U-03** Sin km → `nil`: `"Series 8x400 m"`, `"Descanso"`, `"Fuerza A"`. ✅
+      Incluye los números que **no** son distancia (series, minutos, metros) y la ruta real por
+      `WorkoutDay.plannedKm`: un día de fuerza o descanso no aporta km fantasma al volumen semanal.
 - [ ] **U-04** Case-insensitive: `"FONDO 10 KM"` → `10`.
 - [ ] **U-05** ⚠️ Toma el **primer** match de `title + " " + detail`: `"Rodaje"` + `"5 km/h de
       viento, 10 km totales"` → `5`. Y `"1.000 km"` → `1.0`. Fijar el contrato o arreglarlo.
