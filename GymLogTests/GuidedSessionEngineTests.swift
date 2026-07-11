@@ -1543,4 +1543,143 @@ struct GuidedSessionEngineTests {
         makeExercise("Press banca", on: day, order: 0, sets: [(nil, nil)], in: db.context)
         #expect(!day.orderedExercises.isEmpty)
     }
+
+    // MARK: - I-17
+
+    // El prellenado es lo que hace que registrar una serie sea **un solo tap**: al llegar a
+    // una serie, las reps ya están en el objetivo del plan y el peso en el último que usaste.
+    // Solo tocás la rueda si no llegaste al objetivo o si subiste el peso.
+    //
+    // Su regla no negociable: **nunca pisa lo que el usuario cargó**. Un prellenado que
+    // sobrescribe no ahorra un tap, borra un dato.
+
+    @Test(
+        "I-17 · Las reps se prellenan con el objetivo del plan",
+        arguments: [
+            // Un rango se prellena con el **máximo**: es la meta a alcanzar, y la rueda solo
+            // se toca para bajar si no se llegó. Prellenar con el mínimo obligaría a subirla
+            // siempre que el entrenamiento salga bien.
+            ("6-8", 8),
+            ("10-12", 12),
+            // Un número solo.
+            ("10", 10),
+            // Objetivo en tiempo (plancha, isométricos): el campo cuenta segundos.
+            ("30 s", 30),
+        ]
+    )
+    func repsArePrefilledWithThePlanTarget(target: String, expected: Int) throws {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, in: db.context)
+        makeExercise("Press banca", on: day, order: 0, targetReps: target,
+                     sets: [(nil, nil)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        #expect(try #require(engine.currentStep?.set).reps == expected)
+    }
+
+    @Test("I-17 · Sin objetivo en el plan, las reps quedan vacías")
+    func noTargetLeavesRepsEmpty() throws {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, in: db.context)
+        // Un ejercicio cargado a mano, sin `targetReps`.
+        makeExercise("Press banca", on: day, order: 0, sets: [(nil, nil)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // No se inventa un número: la rueda arranca vacía y la carga el usuario.
+        #expect(try #require(engine.currentStep?.set).reps == nil)
+    }
+
+    @Test("I-17 · El prellenado nunca pisa lo que el usuario ya cargó")
+    func prefillNeverOverwritesUserData() throws {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, in: db.context)
+        // La serie ya tiene datos: es lo que pasa al volver atrás a corregir (I-09/I-10), o
+        // al retomar una sesión donde se cargó algo y no se confirmó.
+        makeExercise("Press banca", on: day, order: 0, targetReps: "6-8",
+                     sets: [(72.5, 5)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Las 5 reps son el dato real (no se llegó a las 8) y los 72,5 kg también. Si el
+        // prellenado los pisara con 8 y con el peso de la sesión pasada, el usuario perdería
+        // lo que registró sin darse cuenta.
+        let serie = try #require(engine.currentStep?.set)
+        #expect(serie.reps == 5)
+        #expect(serie.weight == 72.5)
+    }
+
+    @Test("I-17 · Los ejercicios de peso corporal no reciben peso")
+    func bodyweightExercisesGetNoWeight() throws {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, in: db.context)
+        // Este nombre está en el plan como `weighted: false`, así que `tracksWeight` es
+        // `false`. Poner un peso acá no significaría nada.
+        makeExercise("Abdominales bisagra a dos piernas", on: day, order: 0,
+                     targetReps: "12", sets: [(nil, nil)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        let serie = try #require(engine.currentStep?.set)
+        #expect(serie.reps == 12, "Las reps sí se prellenan")
+        #expect(serie.weight == nil, "El peso no")
+    }
+
+    @Test("I-17 · Al avanzar, la serie siguiente se prellena con el peso de la anterior")
+    func advancingPrefillsTheNextSetWithThePreviousWeight() throws {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Serie 1: el usuario carga 80 kg y confirma.
+        let primera = try #require(engine.currentStep?.set)
+        primera.weight = 80
+        engine.completeCurrent()
+        engine.skipRest()
+
+        // Serie 2: llega con los 80 kg puestos y las reps en el objetivo (8, de "6-8"). Este
+        // es el caso que hace que la sesión sea un tap por serie — y el motivo por el que el
+        // prellenado corre en `advance()`, no solo al arrancar.
+        let segunda = try #require(engine.currentStep?.set)
+        #expect(segunda.weight == 80)
+        #expect(segunda.reps == 8)
+
+        // Y si sube el peso, la tercera lo hereda: el prellenado sigue al último cargado, no
+        // al primero.
+        segunda.weight = 85
+        engine.completeCurrent()
+        engine.skipRest()
+        #expect(try #require(engine.currentStep?.set).weight == 85)
+    }
+
+    @Test("I-17 · El peso no cruza de un ejercicio a otro")
+    func weightDoesNotLeakBetweenExercises() throws {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Hace las 3 series del press con 80 kg.
+        for _ in 0..<3 {
+            engine.currentStep?.set?.weight = 80
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+
+        // Llega al remo: `suggestedWeight` solo mira las series **del mismo ejercicio**, así
+        // que no arrastra los 80 kg del press. Sin historial previo del remo, el peso queda
+        // vacío. Lo contrario sería peor que no prellenar: un número plausible y equivocado.
+        #expect(engine.currentStep?.exercise.name == "Remo")
+        let serieDelRemo = try #require(engine.currentStep?.set)
+        #expect(serieDelRemo.weight == nil)
+        #expect(serieDelRemo.reps == 10, "Las reps sí: salen del objetivo del remo")
+    }
 }

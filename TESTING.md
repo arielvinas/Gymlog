@@ -382,8 +382,12 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       termina — la diferencia no es "tener series", es **"tener pasos"**.
       Lo gatean las dos apps (`day.orderedExercises.isEmpty` → `emptyState` en iPhone, "Sin
       ejercicios cargados" en el reloj).
-- [ ] **I-17** `prefillCurrentSet` aplica reps objetivo (`"6-8"` → **8**, el máximo) + peso
-      sugerido, y **nunca pisa** lo que el usuario ya cargó.
+- [x] **I-17** `prefillCurrentSet` aplica reps objetivo (`"6-8"` → **8**, el máximo: es la meta, y
+      la rueda solo se baja si no se llegó) + peso sugerido, y **nunca pisa** lo que el usuario ya
+      cargó. ✅ Sin `targetReps` no inventa un número. Los de peso corporal no reciben peso.
+      Corre también en `advance()`, no solo al arrancar: por eso la serie siguiente llega con el
+      **último** peso cargado y la sesión es un tap por serie. El peso **no cruza de un ejercicio
+      a otro** — un número plausible y equivocado sería peor que no prellenar.
 - [ ] **I-18** `suggestedWeight` prefiere el peso de la serie previa **de esta sesión** por sobre el
       histórico, y salta series intermedias sin peso.
 - [ ] **I-19** `apply(_ command:)` produce **la misma transición** que el método directo, para cada
