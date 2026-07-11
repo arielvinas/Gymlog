@@ -316,8 +316,12 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       Los dos clamps son distintos a propósito: el remanente baja a **1 s** (el descanso se corta ya)
       pero el total recordado no baja de **15 s** (para no dejar al ejercicio con un descanso
       inservible). Efecto colateral: el anillo de la UI queda casi vacío (`restFraction` = 1/15).
-- [ ] **I-09** `goBackFromLogging` vuelve atrás y **des-marca** la serie. En `index == 0` es no-op
-      **y no emite `onStateChanged`** (el iPhone no recibe eco).
+- [x] **I-09** `goBackFromLogging` vuelve atrás y **des-marca** la serie. En `index == 0` es no-op
+      **y no emite `onStateChanged`** (el iPhone no recibe eco). ✅
+      Des-marcar es lo que importa: si la serie siguiera marcada, al retomar la sesión el engine la
+      saltearía y perderías la corrección. El no-op silencioso en el índice 0 **no es un bug** (el
+      estado no cambió, no hay nada que difundir), pero implica que la Live Activity no puede
+      distinguir "no llegó el comando" de "llegó y era no-op".
 - [ ] **I-10** `goBackFromResting` **no avanza el índice** y deja `restTotal`/`restRemaining`/
       `restOvertime` con basura del descanso anterior. Fijar el contrato.
 - [ ] **I-11** ⚠️ **Bug 5.** `skipRest()` en `.logging` **avanza igual**, salteándose una serie.

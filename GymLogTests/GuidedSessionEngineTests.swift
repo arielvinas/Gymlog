@@ -660,4 +660,75 @@ struct GuidedSessionEngineTests {
         #expect(engine.restTotal == 0, "Sin descanso en curso no hay nada que ajustar")
         #expect(press.restSeconds == 90, "Y no debería tocar la preferencia del ejercicio")
     }
+
+    // MARK: - I-09
+
+    @Test("I-09 · Volver atrás des-marca la serie para poder recargarla")
+    func goingBackUnmarksTheSet() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+        let press = day.orderedExercises[0]
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        engine.completeCurrent()
+        engine.skipRest()
+        #expect(engine.index == 1)
+        #expect(press.orderedSets[0].isDone)
+
+        engine.goBackFromLogging()
+
+        #expect(engine.index == 0)
+        #expect(engine.phase == .logging)
+
+        // Clave: la serie vuelve a estar "sin hacer". Si siguiera marcada, al retomar
+        // la sesión más tarde el engine la saltearía y perderías la corrección.
+        #expect(!press.orderedSets[0].isDone)
+    }
+
+    @Test("I-09 · En la primera serie no hay a dónde volver")
+    func goingBackAtTheFirstStepDoesNothing() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        var cambios = 0
+        engine.onStateChanged = { cambios += 1 }
+
+        engine.goBackFromLogging()
+
+        #expect(engine.index == 0)
+
+        // ⚠️ Y **no emite `onStateChanged`**: el iPhone no recibe eco de que apretó un
+        // botón que no hizo nada. No es un bug —el estado no cambió, así que no hay
+        // nada que difundir— pero significa que la Live Activity no puede distinguir
+        // "no llegó el comando" de "llegó y era no-op". Queda escrito.
+        #expect(cambios == 0)
+    }
+
+    @Test("I-09 · Volver atrás cruza el límite entre ejercicios")
+    func goingBackCrossesExerciseBoundary() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Avanza hasta la primera serie del remo (índice 3).
+        for _ in 0..<3 {
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+        #expect(engine.currentStep?.exercise.name == "Remo")
+
+        engine.goBackFromLogging()
+
+        // Vuelve a la última serie del press, no a la primera del remo.
+        #expect(engine.currentStep?.exercise.name == "Press banca")
+        #expect(engine.currentStep?.setNumber == 3)
+        #expect(!day.orderedExercises[0].orderedSets[2].isDone)
+    }
 }
