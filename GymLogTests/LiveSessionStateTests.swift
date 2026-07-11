@@ -1,0 +1,60 @@
+//
+//  LiveSessionStateTests.swift
+//  GymLogTests
+//
+//  El contrato de serialización entre el reloj (autoridad) y el iPhone (espejo).
+//  Es lo único que sostiene la sesión en vivo: si un rename rompe el Codable, la
+//  sesión deja de reflejarse y nadie se entera hasta usarlo en el gimnasio.
+//
+//  Backlog: TESTING.md · U-12..U-17
+//
+
+import Foundation
+import Testing
+@testable import Maraton
+
+@Suite("Sesión en vivo · serialización")
+struct LiveSessionStateTests {
+
+    /// Snapshot con **todos** los campos poblados, incluidos los opcionales.
+    /// Las fechas salen de `date(...)` (mediodía, segundos enteros) para que el
+    /// round-trip por JSON sea exacto y el test no dependa de la precisión de
+    /// `Date()`.
+    private func fullSnapshot() -> LiveSessionSnapshot {
+        LiveSessionSnapshot(
+            sessionID: UUID(uuidString: "3F2504E0-4F89-11D3-9A0C-0305E82C3301")!,
+            dayDate: date(2026, 7, 1),
+            phase: .resting,
+            exerciseName: "Press banca",
+            exerciseIndex: 2,
+            exerciseCount: 8,
+            setNumber: 3,
+            setCount: 4,
+            targetReps: "6-8",
+            isBodyweight: false,
+            isTimeBased: false,
+            weight: 42.5,
+            reps: 8,
+            restEndDate: date(2026, 7, 2),
+            restTotal: 90,
+            isOvertime: true,
+            heartRate: 131,
+            progressFraction: 0.375,
+            loggedSetsCount: 11,
+            totalVolume: 1234.5,
+            updatedAt: date(2026, 7, 3)
+        )
+    }
+
+    // MARK: - U-12
+
+    @Test("U-12 · Round-trip de un snapshot completo")
+    func snapshotRoundTripsWithAllFieldsSet() throws {
+        let original = fullSnapshot()
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(LiveSessionSnapshot.self, from: data)
+
+        #expect(decoded == original)
+    }
+}

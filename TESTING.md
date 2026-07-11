@@ -159,7 +159,7 @@ La fruta madura: importa **solo Foundation**, todo es `Codable` + `Equatable`, y
 ya encapsula el encode/decode. Cero refactor, y protege el contrato reloj↔iPhone, que hoy no tiene
 ninguna red.
 
-- [ ] **U-12** Round-trip de un `LiveSessionSnapshot` completo.
+- [x] **U-12** Round-trip de un `LiveSessionSnapshot` completo. ✅
 - [ ] **U-13** Round-trip con todos los opcionales en `nil`.
 - [ ] **U-14** Round-trip de `LiveSessionAction.adjustRest(±15)` — el caso con valor asociado, el
       más frágil ante un rename. Y cada `case` restante.
