@@ -106,4 +106,44 @@ struct LiveSessionStateTests {
         #expect(decoded.restEndDate == nil)
         #expect(decoded.heartRate == nil)
     }
+
+    // MARK: - U-14
+
+    /// Cada acción que el iPhone puede mandarle al reloj. `adjustRest` es el único
+    /// `case` con valor asociado, así que su `Codable` sintetizado usa un contenedor
+    /// anidado: es lo primero que se rompe ante un rename, y lo que menos se nota
+    /// (los botones ±15 de la Live Activity dejarían de hacer efecto, en silencio).
+    @Test(
+        "U-14 · Round-trip de cada acción",
+        arguments: [
+            LiveSessionAction.completeCurrent,
+            .skipRest,
+            .goBack,
+            .adjustRest(15),
+            .adjustRest(-15),
+            .end,
+        ]
+    )
+    func actionRoundTrips(action: LiveSessionAction) throws {
+        let data = try JSONEncoder().encode(action)
+        let decoded = try JSONDecoder().decode(LiveSessionAction.self, from: data)
+
+        #expect(decoded == action)
+    }
+
+    @Test("U-14 · El delta de adjustRest sobrevive con su signo")
+    func adjustRestPreservesDelta() throws {
+        // No alcanza con que el `case` sea el correcto: si el valor asociado se
+        // perdiera o cambiara de signo, "±15" ajustaría para el lado equivocado.
+        for delta in [-30, -15, 0, 15, 30] {
+            let data = try JSONEncoder().encode(LiveSessionAction.adjustRest(delta))
+            let decoded = try JSONDecoder().decode(LiveSessionAction.self, from: data)
+
+            guard case .adjustRest(let recovered) = decoded else {
+                Issue.record("adjustRest(\(delta)) volvió como otro case: \(decoded)")
+                return
+            }
+            #expect(recovered == delta)
+        }
+    }
 }
