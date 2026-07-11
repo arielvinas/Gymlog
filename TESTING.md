@@ -141,9 +141,14 @@ La función más pura del repo y la que más casos raros tiene.
 - [x] **U-03** Sin km → `nil`: `"Series 8x400 m"`, `"Descanso"`, `"Fuerza A"`. ✅
       Incluye los números que **no** son distancia (series, minutos, metros) y la ruta real por
       `WorkoutDay.plannedKm`: un día de fuerza o descanso no aporta km fantasma al volumen semanal.
-- [ ] **U-04** Case-insensitive: `"FONDO 10 KM"` → `10`.
-- [ ] **U-05** ⚠️ Toma el **primer** match de `title + " " + detail`: `"Rodaje"` + `"5 km/h de
-      viento, 10 km totales"` → `5`. Y `"1.000 km"` → `1.0`. Fijar el contrato o arreglarlo.
+- [x] **U-04** Case-insensitive: `"FONDO 10 KM"` → `10`. ✅
+- [x] **U-05** ⚠️ Toma el **primer** match de `title + " " + detail`: `"Rodaje"` + `"5 km/h de
+      viento, 10 km totales"` → `5`. Y `"1.000 km"` → `1.0`. ✅ **Ambos confirmados.**
+      Ninguno muerde hoy —el plan siempre pone la distancia en el título y el ritmo en el detalle,
+      y nadie planifica 1000 km en un día—, pero quedan escritos. El del separador de miles es
+      irreparable sin cambiar el contrato: el regex acepta punto **y** coma como decimal, así que
+      no puede distinguir `1.000` (mil, es-AR) de `1.000` (uno coma cero). Si algún día se formatean
+      los km con separador de miles, esto los rompe.
 
 ### Formateo (`NumberFormatting`, `TimeFormatting`, `DateFormatting`)
 

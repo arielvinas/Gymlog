@@ -120,4 +120,53 @@ struct PlannedDistanceTests {
         )
         #expect(descanso.plannedKm == nil)
     }
+
+    // MARK: - U-04
+
+    @Test(
+        "U-04 · La unidad se reconoce sin importar la caja",
+        arguments: [
+            "FONDO 10 KM",
+            "Fondo 10 Km",
+            "fondo 10 kM",
+            "Fondo 10 km",
+        ]
+    )
+    func unitIsCaseInsensitive(text: String) {
+        // El plan lo escribe el usuario a mano: nadie garantiza que "km" venga en
+        // minúscula. Si el regex fuese sensible a la caja, un "10 KM" contaría 0.
+        #expect(PlannedDistance.parse(text) == 10)
+    }
+
+    // MARK: - U-05
+
+    // ⚠️ Estos tests **documentan limitaciones**, no las aprueban.
+    //
+    // `parse` toma el **primer** match de `title + " " + detail` y se detiene ahí.
+    // Mientras el título lleve la distancia y el detalle sea el ritmo, funciona. Pero
+    // basta con que aparezca un número con "km" antes del que importa para que lea el
+    // equivocado — y no hay forma de notarlo salvo mirando el total de la semana.
+
+    @Test("U-05 · Toma el primer km del texto, aunque no sea el que importa")
+    func takesTheFirstMatchEvenIfWrong() {
+        // El caso que funciona: la distancia va primero, el ritmo después.
+        #expect(PlannedDistance.parse("Rodaje 8 km a 5:30 min/km") == 8)
+
+        // El caso que NO: si el detalle menciona otra cosa medida en km antes de la
+        // distancia real, se lleva ese número. Acá el día es de 10 km, pero cuenta 5.
+        #expect(
+            PlannedDistance.parse("Rodaje 5 km/h de viento, 10 km totales") == 5,
+            "Comportamiento actual: se queda con el primer número, no con la distancia"
+        )
+    }
+
+    @Test("U-05 · El separador de miles se lee como decimal")
+    func thousandsSeparatorIsMisreadAsDecimal() {
+        // El regex acepta punto Y coma como separador decimal, así que no puede
+        // distinguir "1.000 km" (mil, formato es-AR) de "1.000" (uno coma cero).
+        // Gana la lectura decimal. En la práctica no molesta —nadie planifica 1000 km
+        // en un día— pero si algún día se formatean km con separador de miles, esto
+        // los rompe.
+        #expect(PlannedDistance.parse("Fondo 1.000 km") == 1.0)
+    }
 }
