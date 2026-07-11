@@ -322,8 +322,14 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       saltearía y perderías la corrección. El no-op silencioso en el índice 0 **no es un bug** (el
       estado no cambió, no hay nada que difundir), pero implica que la Live Activity no puede
       distinguir "no llegó el comando" de "llegó y era no-op".
-- [ ] **I-10** `goBackFromResting` **no avanza el índice** y deja `restTotal`/`restRemaining`/
-      `restOvertime` con basura del descanso anterior. Fijar el contrato.
+- [x] **I-10** `goBackFromResting` **no avanza el índice** (la serie a corregir es la actual) y
+      **deja la serie marcada** —asimetría deliberada con I-09: la serie se hizo, lo que se corrige
+      son sus números. ✅
+      ⚠️ Confirmado: deja `restTotal`/`restRemaining`/`restOvertime` con basura del descanso
+      anterior. **Hoy es inofensiva**: `makeSnapshot` deriva `restEndDate` e `isOvertime` de la
+      fase, no de los contadores, y `startRest` los reinicia en el próximo descanso (incluido el
+      umbral del aviso). El único que viaja crudo al snapshot es `restTotal`. Queda como deuda:
+      si alguien lo usa suelto, va a leer los segundos de un descanso que ya no existe.
 - [ ] **I-11** ⚠️ **Bug 5.** `skipRest()` en `.logging` **avanza igual**, salteándose una serie.
 - [ ] **I-12** `bringExerciseNext` reordena los `Exercise.order` y **preserva lo ya registrado**.
 - [ ] **I-13** `bringExerciseNext` sobre el ejercicio actual → no-op. Durante `.resting` → reubica

@@ -731,4 +731,156 @@ struct GuidedSessionEngineTests {
         #expect(engine.currentStep?.setNumber == 3)
         #expect(!day.orderedExercises[0].orderedSets[2].isDone)
     }
+
+    // MARK: - I-10
+
+    // Volver atrás **desde el descanso** es otra cosa que volver atrás desde la carga:
+    // acá la serie que se quiere corregir es la que se acaba de cargar, o sea la actual.
+    // Por eso `goBackFromResting` **no mueve el índice** — solo corta el descanso y
+    // devuelve la fase a `.logging`.
+
+    @Test("I-10 · Volver desde el descanso corta el descanso y no mueve el índice")
+    func goingBackFromRestKeepsTheIndex() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var descansosTerminados = 0
+        var cambios = 0
+        engine.onRestEnded = { descansosTerminados += 1 }
+        engine.start(day: day, context: db.context)
+        engine.onStateChanged = { cambios += 1 }
+
+        engine.completeCurrent()
+        #expect(engine.phase == .resting)
+        cambios = 0  // el eco de `completeCurrent` ya se contó
+
+        engine.goBackFromResting()
+
+        #expect(engine.phase == .logging)
+        #expect(engine.index == 0, "La serie a corregir es la actual, no la anterior")
+        #expect(engine.currentStep?.setNumber == 1)
+
+        // El descanso se corta de verdad: sin esto, `tickRest` seguiría corriendo contra
+        // una fecha vieja y la notificación local del reloj sonaría en el medio de la
+        // corrección.
+        #expect(engine.restEndDate == nil)
+        #expect(descansosTerminados == 1)
+        #expect(cambios == 1)
+    }
+
+    @Test("I-10 · La serie corregida sigue marcada como hecha")
+    func goingBackFromRestLeavesTheSetDone() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.completeCurrent()
+        engine.goBackFromResting()
+
+        // Asimetría deliberada con `goBackFromLogging`, que sí des-marca (ver I-09).
+        // Y está bien: la serie **se hizo**, lo que se corrige son sus números, que la
+        // UI edita por binding sobre la misma `ExerciseSet`. Si se des-marcara y el
+        // usuario abandonara la sesión ahí, al retomar tendría que volver a "hacer" una
+        // serie que ya hizo.
+        let primera = day.orderedExercises[0].orderedSets[0]
+        #expect(primera.isDone)
+    }
+
+    @Test("I-10 · Los contadores del descanso quedan con basura del descanso anterior")
+    func goingBackFromRestLeavesStaleCounters() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        // 35 s de tiempo extra sobre un descanso de 90 s.
+        engine.tickRest(now: fin.addingTimeInterval(35))
+        #expect(engine.restOvertime == 35)
+
+        engine.goBackFromResting()
+
+        // ⚠️ Comportamiento actual: `goBackFromResting` limpia `restEndDate` y la fase,
+        // pero **no** los tres contadores. Quedan congelados en el último valor del
+        // descanso que se acaba de abandonar.
+        #expect(engine.phase == .logging)
+        #expect(engine.restTotal == 90)
+        #expect(engine.restRemaining == 0)
+        #expect(engine.restOvertime == 35, "Basura: ya no hay descanso, pero el contador sigue")
+    }
+
+    @Test("I-10 · La basura no se filtra al snapshot")
+    func staleCountersDoNotLeakIntoTheSnapshot() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+        engine.tickRest(now: fin.addingTimeInterval(35))
+
+        engine.goBackFromResting()
+        let snapshot = engine.makeSnapshot()
+
+        // Esto es lo que hace que la basura de arriba sea inofensiva **hoy**: los dos
+        // campos que la Live Activity mira para decidir si dibuja el descanso están en
+        // su valor de reposo, porque `makeSnapshot` los deriva de la fase, no de los
+        // contadores.
+        #expect(snapshot.phase == .logging)
+        #expect(snapshot.restEndDate == nil)
+        #expect(!snapshot.isOvertime)
+
+        // El único que viaja crudo es `restTotal`. No molesta mientras el consumidor lo
+        // use solo junto con `restEndDate` — que es lo que hace hoy. Si mañana alguien lo
+        // usa suelto (para dibujar un anillo, por ejemplo), va a leer los 90 s de un
+        // descanso que ya no existe. Por eso el contrato correcto es limpiarlos acá.
+        #expect(snapshot.restTotal == 90)
+    }
+
+    @Test("I-10 · El próximo descanso arranca limpio, sin arrastrar el tiempo extra")
+    func theNextRestStartsClean() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        // Se va a tiempo extra, vuelve atrás a corregir la serie...
+        engine.tickRest(now: fin.addingTimeInterval(35))
+        engine.goBackFromResting()
+
+        var avisos = 0
+        engine.onRestAlert = { avisos += 1 }
+
+        // ...y vuelve a confirmarla: arranca un descanso nuevo.
+        engine.completeCurrent()
+        #expect(engine.phase == .resting)
+
+        // `startRest` reinicia los tres contadores, así que la basura de I-10 es
+        // transitoria: no sobrevive al próximo descanso.
+        #expect(engine.restTotal == 90)
+        #expect(engine.restRemaining == 90)
+        #expect(engine.restOvertime == 0)
+
+        // Y el umbral del aviso también se reinicia. Si `nextOvertimeAlert` hubiera
+        // quedado en 40 (el que dejó el tiempo extra anterior), este primer aviso a los
+        // 5 s de excedido **no sonaría**: el usuario se quedaría esperando una vibración
+        // que llegaría 35 s tarde.
+        let nuevoFin = try #require(engine.restEndDate)
+        engine.tickRest(now: nuevoFin.addingTimeInterval(5))
+        #expect(avisos == 1)
+    }
+
+    @Test("I-10 · Llamarlo fuera del descanso no rompe nada")
+    func goingBackFromRestOutsideRestIsHarmless() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var descansosTerminados = 0
+        engine.onRestEnded = { descansosTerminados += 1 }
+        engine.start(day: day, context: db.context)
+
+        // A diferencia de `skipRest` (ver I-11), `goBackFromResting` **no valida la fase**
+        // pero tampoco la necesita: en `.logging` no avanza el índice ni des-marca nada,
+        // así que lo peor que hace es emitir un `onRestEnded` de más — que cancela una
+        // notificación que no existe. `apply(.goBack)` igual lo protege con un `if`.
+        engine.goBackFromResting()
+
+        #expect(engine.phase == .logging)
+        #expect(engine.index == 0)
+        #expect(descansosTerminados == 1, "Emite el efecto igual, aunque no había descanso")
+    }
 }
