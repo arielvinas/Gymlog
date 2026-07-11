@@ -1467,4 +1467,80 @@ struct GuidedSessionEngineTests {
         #expect(reabierto.phase == .logging, "⚠️ El `.done` no sobrevive a cerrar la sesión")
         #expect(reabierto.index == 0)
     }
+
+    // MARK: - I-16
+
+    // El otro lado del mismo `?? 0` del bug 12: un día **sin ejercicios**. Acá el engine no
+    // se equivoca de serie — directamente no tiene ninguna, y el resultado es una sesión
+    // que **no puede terminar**.
+    //
+    // **No es alcanzable**: las dos plataformas lo gatean antes de entrar (`GymSessionView`
+    // muestra su `emptyState`, el reloj muestra "Sin ejercicios cargados"). Los tests fijan
+    // el borde por si algún día se entra por otro lado.
+
+    @Test("I-16 · ⚠️ Un día sin ejercicios arma una sesión que no puede terminar")
+    func anEmptyDayCannotFinish() {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, title: "Fuerza A", in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        #expect(engine.steps.isEmpty)
+        #expect(engine.currentStep == nil)
+        #expect(engine.progressFraction == 0)
+
+        // ⚠️ `isLastStep` es `index >= steps.count - 1` → `0 >= -1` → **true**. O sea: el
+        // engine cree estar parado en el último paso de una lista vacía. Es coherente con la
+        // aritmética y absurdo con la realidad.
+        #expect(engine.isLastStep, "⚠️ 0 >= -1: el último paso de una lista vacía")
+
+        // Pero `completeCurrent` arranca con `guard let step = currentStep`, así que ese
+        // "último paso" no se puede completar: `finish()` nunca corre.
+        engine.completeCurrent()
+
+        #expect(engine.phase == .logging, "⚠️ La sesión no llega nunca a `.done`")
+        #expect(!day.isCompleted, "⚠️ Y el día no se marca como hecho")
+
+        // La sesión queda en un limbo: sin nada que mostrar y sin forma de cerrarse desde
+        // adentro. La única salida es el botón de cerrar de la vista.
+    }
+
+    @Test("I-16 · Un día con solo un ejercicio de core sí termina")
+    func aDayWithOnlyACoreExerciseFinishes() {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, title: "Fuerza A", in: db.context)
+
+        // El contraste que aísla el problema. Un ejercicio sin series (plancha, core) **sí**
+        // ocupa un paso —ver I-01—, así que `steps` no queda vacío y `completeCurrent`
+        // encuentra algo. La diferencia no es "tener series", es "tener pasos".
+        makeExercise("Plancha", on: day, order: 0, targetReps: "30 s", in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        #expect(engine.steps.count == 1)
+        #expect(engine.isLastStep)
+
+        engine.completeCurrent()
+
+        #expect(engine.phase == .done)
+        #expect(day.isCompleted)
+    }
+
+    @Test("I-16 · Lo que contiene el bug: ninguna de las dos apps deja entrar")
+    func bothPlatformsGateTheEmptyDay() {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, title: "Fuerza A", in: db.context)
+
+        // `GymSessionView` (iPhone) muestra su `emptyState` en vez del botón, y
+        // `WatchWorkoutView` (reloj) muestra "Sin ejercicios cargados". Las dos preguntan lo
+        // mismo: `day.orderedExercises.isEmpty`. Este test fija esa condición, que es la que
+        // sostiene la guarda de las dos UIs.
+        #expect(day.orderedExercises.isEmpty)
+
+        // Con un ejercicio, las dos abren la sesión.
+        makeExercise("Press banca", on: day, order: 0, sets: [(nil, nil)], in: db.context)
+        #expect(!day.orderedExercises.isEmpty)
+    }
 }

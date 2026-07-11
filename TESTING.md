@@ -40,12 +40,21 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
 | 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. | I-21 |
 | 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. | U-27, U-35 |
-| **12** | 🆕 **Reabrir un día terminado reinicia la sesión.** ✅ **CONFIRMADO y alcanzable** (I-15). `firstIncompleteIndex` hace `firstIndex { … } ?? 0`: sin series pendientes devuelve **0**, indistinguible de "la primera está pendiente". El botón "Empezar sesión guiada" **no está gateado por `isCompleted`**, así que abrir un día ya entrenado te deja en la serie 1 con el botón de completar listo — y seguir el flujo arranca un descanso de 90 s y rehace la sesión. La fase `.done` solo la pone `finish()`, o sea que **vive en memoria y no sobrevive a cerrar la sesión**. Datos no se pierden. **Pendiente de arreglar.** | I-15 ✅ |
+| **12** | 🆕 **Reabrir un día terminado reinicia la sesión.** ✅ **CONFIRMADO y alcanzable** (I-15). `firstIncompleteIndex` hace `firstIndex { … } ?? 0`: sin series pendientes devuelve **0**, indistinguible de "la primera está pendiente". El botón "Empezar sesión guiada" **no está gateado por `isCompleted`**, así que abrir un día ya entrenado te deja en la serie 1 con el botón de completar listo — y seguir el flujo arranca un descanso de 90 s y rehace la sesión. La fase `.done` solo la pone `finish()`, o sea que **vive en memoria y no sobrevive a cerrar la sesión**. Datos no se pierden. **Pendiente de arreglar** — ⚠️ **ojo con el fix**: ver la nota de abajo. | I-15 ✅ |
 
 Además, dos contradicciones entre el código y sus comentarios, que hay que resolver decidiendo
 cuál gana: `applyPlanUpdates` dice "los días que el usuario borre no se vuelven a insertar" pero
 compara por fecha (I-23), y `taperVariant` dice "sin el trabajo de pierna" pero solo saca
 "Flexión de rodillas", dejando aductores y extensión de rodillas (U-19).
+
+> ⚠️ **Nota sobre el fix del bug 12 (hallada en I-16).** El reloj **sí quiere** reabrir días
+> completos: `WatchWorkoutView` rotula el botón **"Repetir sesión"** cuando `day.isCompleted`.
+> O sea que reabrir no es el bug — el bug es **cómo se reabre**. En el iPhone el botón dice
+> "Empezar sesión guiada" pase lo que pase (no distingue), y en ninguna de las dos plataformas
+> el engine **des-marca las series**: caés en la serie 1 ya tildada como hecha, con los pesos
+> viejos. Un `phase = .done` al arrancar rompería el "Repetir sesión" del reloj. Lo que hace
+> falta es distinguir **retomar** (ir a la primera pendiente) de **repetir** (limpiar los
+> `isDone` y arrancar de cero), y que la UI diga cuál de las dos pidió.
 
 ## Lo que NO se puede automatizar
 
@@ -365,8 +374,14 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       `isCompleted`. Seguir el flujo arranca un descanso de 90 s y rehace la sesión entera.
       La raíz: `.done` solo lo pone `finish()`, así que **la fase no se deriva del estado del día**
       y no sobrevive a cerrar la sesión. **Pendiente de arreglar.**
-- [ ] **I-16** **Día sin ejercicios:** `steps == []`, `isLastStep == true` (!), `completeCurrent` es
-      no-op → **la sesión nunca llega a `.done`**.
+- [x] **I-16** **Día sin ejercicios — confirmado, pero NO alcanzable.** ✅ `steps == []`,
+      `currentStep == nil`, y `isLastStep` da **`true`** (`0 >= -1`): el engine cree estar en el
+      último paso de una lista vacía. Pero `completeCurrent` sale por su `guard let step`, así que
+      `finish()` nunca corre y **la sesión no llega nunca a `.done`** ni marca el día.
+      El contraste que aísla la causa: un día con **solo un ejercicio de core** (sin series) sí
+      termina — la diferencia no es "tener series", es **"tener pasos"**.
+      Lo gatean las dos apps (`day.orderedExercises.isEmpty` → `emptyState` en iPhone, "Sin
+      ejercicios cargados" en el reloj).
 - [ ] **I-17** `prefillCurrentSet` aplica reps objetivo (`"6-8"` → **8**, el máximo) + peso
       sugerido, y **nunca pisa** lo que el usuario ya cargó.
 - [ ] **I-18** `suggestedWeight` prefiere el peso de la serie previa **de esta sesión** por sobre el
