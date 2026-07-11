@@ -1257,4 +1257,99 @@ struct GuidedSessionEngineTests {
 
         #expect(engine.switchableExercises.map(\.name) == ["Sentadilla"])
     }
+
+    // MARK: - I-14
+
+    // ⚠️ **Bug 6.** `bringExerciseNext` no valida que el ejercicio **pertenezca al día**.
+    // El algoritmo es: sacarlo de la lista del día, insertarlo detrás del actual, y
+    // reasignar los `order` de la lista resultante. Con un ejercicio ajeno, el "sacarlo"
+    // no hace nada (no estaba) pero el "insertarlo" sí — y la reasignación de `order`
+    // **le escribe encima al ejercicio de otro día**.
+    //
+    // El daño no se ve en la sesión en curso: `buildSteps` lee de `day.exercises`, así que
+    // el intruso no aparece en los pasos. El daño queda **en el otro día**, esperando.
+    //
+    // **No es alcanzable hoy**: los dos call sites (reloj e iPhone) recorren
+    // `switchableExercises`, que solo devuelve ejercicios del día actual. El bug vive
+    // enteramente en la falta de un `guard`.
+
+    @Test("I-14 · ⚠️ Un ejercicio de otro día le pisa el orden a ese otro día")
+    func bringingAForeignExerciseCorruptsTheOtherDay() {
+        let db = TestDB()
+        let lunes = dayWithThreeExercises(in: db.context)
+
+        // Otro día del plan, con su propio orden sano: 0, 1, 2.
+        let miercoles = makeDay(date(2026, 7, 3), type: .fuerza, title: "Fuerza B", in: db.context)
+        for (i, nombre) in ["Dominadas", "Curl", "Peso muerto"].enumerated() {
+            makeExercise(nombre, on: miercoles, order: i, sets: [(nil, nil)], in: db.context)
+        }
+        #expect(miercoles.orderedExercises.map(\.order) == [0, 1, 2])
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: lunes, context: db.context)
+
+        // Se trae el peso muerto (del miércoles) a la sesión del lunes.
+        let pesoMuerto = miercoles.orderedExercises[2]
+        engine.bringExerciseNext(pesoMuerto)
+
+        // La sesión del lunes ni se entera: `buildSteps` lee de `lunes.exercises`, y el
+        // peso muerto no está ahí. El usuario no ve nada raro.
+        #expect(engine.steps.allSatisfy { $0.exercise.name != "Peso muerto" })
+        #expect(engine.currentStep?.exercise.name == "Press banca")
+
+        // Pero al peso muerto le reescribieron el `order`: pasó de 2 a 1, el lugar que le
+        // tocaba "detrás del press" en la lista del lunes. Y ahora **choca con el curl**,
+        // que también tiene order 1.
+        #expect(pesoMuerto.order == 1)
+        let ordenesDelMiercoles = miercoles.orderedExercises.map(\.order)
+        #expect(ordenesDelMiercoles == [0, 1, 1], "⚠️ El miércoles quedó con dos ejercicios en el mismo orden")
+
+        // Esto es lo que lo hace un bug de verdad y no un detalle cosmético:
+        // `orderedExercises` ordena por `order`, y `sorted` **no garantiza estabilidad** en
+        // Swift. Con dos ejercicios empatados, el orden del miércoles queda indefinido: la
+        // próxima vez que se abra ese día, curl y peso muerto pueden salir en cualquier
+        // orden — y la sesión guiada los va a proponer en ese orden.
+        let nombres = Set(miercoles.orderedExercises.map(\.name))
+        #expect(nombres == ["Dominadas", "Curl", "Peso muerto"], "No se pierde ninguno, solo se desordenan")
+    }
+
+    @Test("I-14 · ⚠️ Y de paso le abre huecos al orden del día actual")
+    func bringingAForeignExerciseLeavesGapsInTheCurrentDay() {
+        let db = TestDB()
+        let lunes = dayWithThreeExercises(in: db.context)
+
+        let otroDia = makeDay(date(2026, 7, 3), type: .fuerza, title: "Fuerza B", in: db.context)
+        let ajeno = makeExercise("Dominadas", on: otroDia, order: 0, sets: [(nil, nil)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: lunes, context: db.context)
+        engine.bringExerciseNext(ajeno)
+
+        // El intruso ocupó el índice 1 al reasignar, así que los del lunes se corrieron:
+        // quedan 0, 2, 3 en vez de 0, 1, 2. No rompe nada (el orden relativo se mantiene y
+        // `orderedExercises` solo compara), pero es basura persistida.
+        #expect(lunes.orderedExercises.map(\.name) == ["Press banca", "Remo", "Sentadilla"])
+        #expect(lunes.orderedExercises.map(\.order) == [0, 2, 3], "⚠️ Huecos en el orden")
+    }
+
+    @Test("I-14 · Lo que contiene el bug: la UI solo ofrece ejercicios del día")
+    func theUIOnlyOffersExercisesFromTheCurrentDay() {
+        let db = TestDB()
+        let lunes = dayWithThreeExercises(in: db.context)
+
+        let otroDia = makeDay(date(2026, 7, 3), type: .fuerza, title: "Fuerza B", in: db.context)
+        makeExercise("Dominadas", on: otroDia, order: 0, sets: [(nil, nil)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: lunes, context: db.context)
+
+        // Los dos call sites de `bringExerciseNext` (reloj e iPhone) hacen `ForEach` sobre
+        // esta lista, y sale de `day.orderedExercises`. Por eso el bug 6 no es alcanzable:
+        // no hay forma de elegir un ejercicio ajeno desde la app.
+        #expect(engine.switchableExercises.map(\.name) == ["Remo", "Sentadilla"])
+        #expect(!engine.switchableExercises.contains { $0.name == "Dominadas" })
+
+        // El `guard` que falta sería `day.orderedExercises.contains { $0 === exercise }`.
+        // Hoy lo suple la UI, que es una garantía por convención, no por tipo.
+    }
 }

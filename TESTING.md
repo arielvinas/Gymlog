@@ -34,7 +34,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 3 | ~~**`GuidedSessionEngine`: con `restSeconds == 0`, `onStateChanged` nunca se emite al entrar en tiempo extra**~~ → **confirmado pero NO alcanzable.** El 0 no se puede producir hoy por ninguna ruta. Agujero de la lógica, no bug visible. Ver I-06. | I-06 ✅ |
 | 4 | **Ráfaga de alertas al volver de background.** ✅ **CONFIRMADO** en I-07: vuelve con 35 s de tiempo extra → **4 vibraciones en <1 s**. Alcanzable a diario (el reloj apaga la pantalla y deja de tickear). **Pendiente de arreglar.** | I-07 ✅ |
 | 5 | ~~**`skipRest()` no valida la fase**~~ → **confirmado pero NO alcanzable** (I-11). En `.logging` saltea una serie; en la última, **deja la sesión en un callejón sin salida**; en `.done`, lo deshace. Lo tapan las UIs (el botón vive en la vista de descanso) y la guarda de `apply(_:)`. | I-11 ✅ |
-| 6 | **`bringExerciseNext` no valida que el ejercicio pertenezca al día** → reordena los `order` de los demás para nada. | I-14 |
+| 6 | ~~**`bringExerciseNext` no valida que el ejercicio pertenezca al día**~~ → **confirmado pero NO alcanzable** (I-14). Peor de lo anotado: no "reordena para nada" — le **reescribe el `order` al ejercicio ajeno**, dejando **dos ejercicios con el mismo `order` en el otro día**. Como `sorted` no es estable, ese día queda con orden indefinido. Lo contiene `switchableExercises`, que solo ofrece ejercicios del día. | I-14 ✅ |
 | 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series puntúa **0** y `cleanupKneeRecovery` **lo borra**. | I-30 |
 | 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`. | I-34 |
 | 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
@@ -350,8 +350,13 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       `restEndDate`, sin `onRestEnded` ni `onRestStarted`. ✅
       Es el momento real de uso —elegís el próximo ejercicio *mientras* descansás— así que cortar
       o reiniciar el descanso ahí sería el peor efecto posible. Lo único que cambia es el "Sigue".
-- [ ] **I-14** ⚠️ **Bug 6.** `bringExerciseNext` con un ejercicio que **no pertenece al día** →
-      reordena a los demás para nada, sin guard.
+- [x] **I-14** ⚠️ **Bug 6 — confirmado, pero NO alcanzable.** ✅ El daño **no queda en la sesión en
+      curso** (`buildSteps` lee de `day.exercises`: el intruso ni aparece, el usuario no ve nada
+      raro) — queda **en el otro día**, esperando: le reescribe el `order` al ejercicio ajeno y lo
+      deja **empatado con otro** de su propio día (`[0, 1, 1]`). `sorted` no garantiza estabilidad,
+      así que ese día pasa a tener orden indefinido. De paso, deja huecos en el orden del día
+      actual (`[0, 2, 3]`). Lo contiene la UI: los dos call sites recorren `switchableExercises`.
+      El `guard` que falta es `day.orderedExercises.contains { $0 === exercise }`.
 - [ ] **I-15** Retomar una sesión a medias arranca en la primera serie incompleta. ⚠️ **Si están
       todas hechas devuelve 0** → reinicia desde el principio en vez de ir a `.done`.
 - [ ] **I-16** **Día sin ejercicios:** `steps == []`, `isLastStep == true` (!), `completeCurrent` es
