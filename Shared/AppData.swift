@@ -30,10 +30,37 @@ enum AppData {
 
     static let log = Logger(subsystem: "ariel.Maraton", category: "AppData")
 
+    /// `true` cuando el proceso es la app hosteando el bundle de tests unitarios.
+    /// XCTest sólo define esta variable en el proceso que hostea los unitarios: en
+    /// los tests de UI la app corre como proceso aparte y arranca normal.
+    ///
+    /// Sirve para que hostear los tests no tenga efectos: sin esto, el `init()` de
+    /// la app siembra el plan en cada corrida y escribe los flags de sembrado
+    /// (`UserDefaults` + KVS) que los tests de seed necesitan controlar.
+    static var isHostingUnitTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    }
+
     /// Crea el contenedor. Con `iCloudSyncEnabled` usa CloudKit (con respaldo
     /// local si no está disponible); si no, almacenamiento local — offline-first.
-    static func makeContainer() -> ModelContainer {
+    ///
+    /// - Parameter inMemory: contenedor efímero, sin tocar el disco ni CloudKit.
+    ///   Para tests y para hostear el bundle de tests.
+    static func makeContainer(inMemory: Bool = false) -> ModelContainer {
         let schema = self.schema
+
+        if inMemory {
+            // `cloudKitDatabase` es `.automatic` por defecto: sin el `.none`
+            // explícito, SwiftData intenta montar CloudKit hasta sobre un store
+            // en memoria.
+            let memoryConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
+            )
+            // Sin respaldo: si esto falla, el test tiene que fallar ruidosamente.
+            return try! ModelContainer(for: schema, configurations: memoryConfig)
+        }
 
         if iCloudSyncEnabled {
             let cloudConfig = ModelConfiguration(schema: schema, cloudKitDatabase: .automatic)

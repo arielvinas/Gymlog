@@ -62,22 +62,38 @@ quedan como **checklist manual** antes de cada release:
 
 ## Fase 0 — Prerequisitos
 
-- [ ] **P0-1 · Target de tests.** Crear `GymLogTests` (unit + integración, `TEST_HOST` =
-      `Maraton.app`, `@testable import Maraton`) y `GymLogUITests` (XCUITest). Hay que editar el
-      `.pbxproj` a mano: los grupos son `PBXFileSystemSynchronizedRootGroup`, pero un **target
-      nuevo** igual se agrega manualmente. **Sin esto no se escribe una línea.**
+- [x] **P0-1 · Target de tests.** ✅ Hecho. `GymLogTests` (unit + integración, Swift Testing,
+      `TEST_HOST` = `Maraton.app`, `@testable import Maraton`) y `GymLogUITests` (XCUITest). Ambos
+      son `PBXFileSystemSynchronizedRootGroup`: **agregar un archivo `.swift` a la carpeta lo suma
+      solo al target**, sin tocar el `.pbxproj`. También se versionó el scheme compartido
+      (`xcshareddata/xcschemes/Maraton.xcscheme`) con los dos targets en su Test action, para que
+      `xcodebuild test` sea reproducible en el CI.
+      Correr todo: `xcodebuild test -scheme Maraton -destination 'platform=iOS Simulator,name=iPhone 17 Pro'`
+      (~17 s). Solo unitarios: agregar `-only-testing:GymLogTests` (~13 s).
 
-- [ ] **P0-2 · Fijar la timezone en los tests.** `PlanConstants.calendar` y los `DateFormatter`
-      de `DateFormatting` usan la **TZ del dispositivo**. Un test con fechas construidas a mano
-      puede dar un día distinto según el runner. Usar siempre `DateComponents.makeDate(...)` (que
-      ya crea las fechas a mediodía) y pinear la TZ en el setup.
+- [x] **P0-2 · Fechas deterministas.** ✅ Hecho. `PlanConstants.calendar` y los `DateFormatter` de
+      `DateFormatting` usan la **TZ del dispositivo**, así que una fecha a medianoche puede caer en
+      otro día según dónde corra el test. `TestSupport.swift` expone `date(2026, 7, 1)`, que
+      construye la fecha **a mediodía**. **Usarla siempre**; no construir fechas a mano.
 
-- [ ] **P0-3 · Container en memoria.** `AppData.makeContainer()` (`Shared/AppData.swift:35`) no
-      acepta parámetros, tiene las dos `ModelConfiguration` hardcodeadas, ninguna usa
-      `isStoredInMemoryOnly`, y si falla hace `fatalError` — que **mata el runner**. Agregar
-      `makeContainer(inMemory: Bool = false)`.
-      *No bloquea la Fase 1:* las funciones de seed y el engine reciben el `ModelContext` por
-      parámetro, así que un test puede armarse su propio container en memoria y pasárselo.
+- [x] **P0-3 · Container en memoria.** ✅ Hecho (parcial). `AppData.makeContainer(inMemory: Bool = false)`
+      devuelve un contenedor efímero, sin disco y sin CloudKit. Ojo: `ModelConfiguration` trae
+      `cloudKitDatabase: .automatic` por defecto — sin el `.none` explícito, SwiftData intenta
+      montar CloudKit **hasta sobre un store en memoria**.
+      También se aisló el host: `MaratonApp.init()` detecta que está hosteando los tests unitarios
+      (`AppData.isHostingUnitTests`) y arranca inerte — contenedor en memoria, sin sembrar y sin
+      abrir el canal con el reloj. **Sin esto, cada corrida de tests escribía los flags de sembrado
+      que los tests de seed necesitan controlar.** Los tests de UI no pasan por ahí: la app corre
+      como proceso aparte y arranca normal.
+      *Falta:* el `fatalError` de la rama no-in-memory sigue ahí (mataría el runner si alguien
+      llamara `makeContainer()` sin `inMemory` desde un test).
+
+      > ⚠️ **Trampa que ya nos costó una hora.** El `ModelContext` **no mantiene vivo** a su
+      > `ModelContainer`. Un helper que cree el contenedor y devuelva solo `container.mainContext`
+      > deja el contexto colgado apenas retorna → el test **crashea con `SIGTRAP`**, no falla. Y
+      > como Swift Testing corre en paralelo, el crash **se lleva puesto al resto de los tests del
+      > proceso**, que aparecen como fallados sin mensaje. Por eso `TestSupport` expone `TestDB`,
+      > que guarda contenedor y contexto juntos: **guardalo en una variable del test.**
 
 - [ ] **P0-4 · Flags de sembrado inyectables.** Los seeds leen y escriben **6 claves globales**
       (`seededPlanVersion`, `seededStrengthVersion`, `cleanedKneeRecoveryV1`, cada una en
@@ -366,11 +382,37 @@ notificaciones). Nada de eso lo cubre el CI.
 
 ---
 
+## Cómo escribir un test
+
+El andamio ya está. `GymLogTests/TestSupport.swift` da:
+
+- **`TestDB()`** — base SwiftData en memoria, aislada por test. Guardala en una variable (ver la
+  trampa del `SIGTRAP` en P0-3).
+- **`date(2026, 7, 1)`** — fecha determinística, a mediodía.
+- **`makeDay(...)`** y **`makeExercise(...)`** — constructores de modelos con defaults razonables.
+
+Agregar un archivo `.swift` a `GymLogTests/` alcanza: el target lo toma solo.
+
+```swift
+@Suite("Volumen semanal")
+struct WeeklyVolumeTests {
+    @Test("El tonelaje ignora las series sin peso")
+    func tonnageIgnoresBodyweightSets() {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), in: db.context)
+        makeExercise("Plancha", on: day, sets: [(nil, nil)], in: db.context)
+        makeExercise("Press", on: day, sets: [(50, 10)], in: db.context)
+
+        #expect(WeeklyVolume.tonnage(for: date(2026, 7, 1), among: day.orderedExercises) == 500)
+    }
+}
+```
+
 ## Orden de ataque
 
 No es el orden de la pirámide:
 
-1. **P0-1** (target de tests) — sin esto no se escribe nada. **P0-2** (timezone) va junto.
+1. ~~**P0-1** (target de tests)~~ ✅ hecho, junto con ~~P0-2~~ y ~~P0-3~~.
 2. **U-12..U-17** (serialización) — cero refactor, y es lo único que protege el contrato
    reloj↔iPhone.
 3. **U-01..U-05** (`PlannedDistance.parse`) — la función más pura y con más casos raros.

@@ -14,6 +14,16 @@ struct MaratonApp: App {
     @State private var navigator = Navigator()
 
     init() {
+        // Hosteando los tests unitarios, la app arranca inerte: contenedor en
+        // memoria, sin sembrar y sin abrir el canal con el reloj. Si no, cada
+        // corrida de tests escribiría los flags de sembrado que los propios tests
+        // necesitan controlar. Los tests de UI no pasan por acá (la app corre
+        // como proceso aparte y arranca normal).
+        guard !AppData.isHostingUnitTests else {
+            container = AppData.makeContainer(inMemory: true)
+            return
+        }
+
         container = AppData.makeContainer()
 
         // Pre-carga el plan, aplica novedades por versión y siembra la rutina
