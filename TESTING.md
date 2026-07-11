@@ -280,7 +280,9 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       (`step.set?.isDone` es un no-op sin serie). Parece un bug, pero no lo es: `firstIncompleteIndex`
       solo mira pasos **con** serie, así que al retomar la sesión el core se saltea igual y no
       bloquea nada. Queda escrito para que nadie lo "arregle" de más.
-- [ ] **I-04** `skipRest` → `.logging` de la serie siguiente.
+- [x] **I-04** `skipRest` → `.logging` de la serie siguiente. ✅ Avanzar limpia el `restEndDate` (si
+      sobreviviera, el iPhone seguiría dibujando una cuenta regresiva sobre una serie que ya no
+      descansa), y `skipRest` es también la salida del tiempo extra ("Empezar serie").
 - [ ] **I-05** **Regla clave:** cuando el descanso llega a cero, el engine **no avanza solo** —
       entra en tiempo extra y espera confirmación. Es la decisión de diseño más importante del
       engine y hoy solo la sostiene un comentario.

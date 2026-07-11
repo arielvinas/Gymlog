@@ -290,4 +290,73 @@ struct GuidedSessionEngineTests {
             "Al retomar debería caer en el remo, no volver a la plancha"
         )
     }
+
+    // MARK: - I-04
+
+    @Test("I-04 · skipRest corta el descanso y avanza a la serie siguiente")
+    func skipRestAdvancesToTheNextSet() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var descansosTerminados = 0
+        engine.onRestEnded = { descansosTerminados += 1 }
+        engine.start(day: day, context: db.context)
+
+        engine.completeCurrent()
+        #expect(engine.phase == .resting)
+        #expect(engine.index == 0)
+
+        engine.skipRest()
+
+        #expect(engine.phase == .logging)
+        #expect(engine.index == 1, "Recién acá se mueve el índice")
+        #expect(engine.currentStep?.setNumber == 2)
+
+        // La plataforma tiene que enterarse para cancelar la notificación local que
+        // había agendado al arrancar el descanso.
+        #expect(descansosTerminados == 1)
+    }
+
+    @Test("I-04 · Al avanzar se limpia el estado del descanso anterior")
+    func advancingClearsThePreviousRest() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        engine.completeCurrent()
+        #expect(engine.restEndDate != nil)
+
+        engine.skipRest()
+
+        // Si `restEndDate` sobreviviera al avance, el snapshot que va al iPhone
+        // seguiría mostrando una cuenta regresiva sobre una serie que ya no descansa.
+        #expect(engine.restEndDate == nil)
+        #expect(engine.restOvertime == 0)
+    }
+
+    @Test("I-04 · skipRest funciona igual en tiempo extra")
+    func skipRestWorksDuringOvertime() throws {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.completeCurrent()
+
+        // Simula que pasaron 20 s desde que venció el descanso: estamos en tiempo extra.
+        // `tickRest(now:)` recibe la fecha, así que no hace falta esperar tiempo real.
+        let fin = try #require(engine.restEndDate)
+        engine.tickRest(now: fin.addingTimeInterval(20))
+        #expect(engine.isRestOvertime)
+
+        // "Empezar serie" es el mismo `skipRest`: es como se sale del tiempo extra.
+        engine.skipRest()
+
+        #expect(engine.phase == .logging)
+        #expect(engine.index == 1)
+        #expect(engine.restOvertime == 0)
+    }
 }
