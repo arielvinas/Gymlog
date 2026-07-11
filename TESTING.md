@@ -33,7 +33,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 2 | **`StreakCalculator.currentWeekStreak` agrupa por `weekTitle` (String), no por semana calendario** → dos semanas con el mismo título se fusionan; una semana partida en dos títulos cuenta doble. | U-32 |
 | 3 | ~~**`GuidedSessionEngine`: con `restSeconds == 0`, `onStateChanged` nunca se emite al entrar en tiempo extra**~~ → **confirmado pero NO alcanzable.** El 0 no se puede producir hoy por ninguna ruta. Agujero de la lógica, no bug visible. Ver I-06. | I-06 ✅ |
 | 4 | **Ráfaga de alertas al volver de background.** ✅ **CONFIRMADO** en I-07: vuelve con 35 s de tiempo extra → **4 vibraciones en <1 s**. Alcanzable a diario (el reloj apaga la pantalla y deja de tickear). **Pendiente de arreglar.** | I-07 ✅ |
-| 5 | **`skipRest()` no valida la fase** → llamado en `.logging` avanza igual, **salteándose una serie entera**. | I-11 |
+| 5 | ~~**`skipRest()` no valida la fase**~~ → **confirmado pero NO alcanzable** (I-11). En `.logging` saltea una serie; en la última, **deja la sesión en un callejón sin salida**; en `.done`, lo deshace. Lo tapan las UIs (el botón vive en la vista de descanso) y la guarda de `apply(_:)`. | I-11 ✅ |
 | 6 | **`bringExerciseNext` no valida que el ejercicio pertenezca al día** → reordena los `order` de los demás para nada. | I-14 |
 | 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series puntúa **0** y `cleanupKneeRecovery` **lo borra**. | I-30 |
 | 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`. | I-34 |
@@ -330,7 +330,15 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       fase, no de los contadores, y `startRest` los reinicia en el próximo descanso (incluido el
       umbral del aviso). El único que viaja crudo al snapshot es `restTotal`. Queda como deuda:
       si alguien lo usa suelto, va a leer los segundos de un descanso que ya no existe.
-- [ ] **I-11** ⚠️ **Bug 5.** `skipRest()` en `.logging` **avanza igual**, salteándose una serie.
+- [x] **I-11** ⚠️ **Bug 5 — confirmado, pero NO alcanzable.** ✅ `skipRest()` no valida la fase
+      (es `onRestEnded` + `advance()`). Los tres daños, en orden de gravedad:
+      en `.logging` se saltea una serie sin registrarla; en la **última** serie el índice se va
+      fuera del arreglo y la sesión queda en un **callejón sin salida** (`currentStep == nil`,
+      fase `.logging`, `finish()` nunca corre, `completeCurrent` es no-op — la única salida es
+      volver atrás); en `.done` **deshace el `.done`** y cae en el mismo callejón.
+      **No es alcanzable**: las tres UIs solo muestran el botón dentro de la vista de descanso y
+      `apply(.skipRest)` valida `phase == .resting`. Esa guarda es lo único que lo separa de ser
+      un bug real. Los tests quedan de guardia para el día que aparezca un call site nuevo.
 - [ ] **I-12** `bringExerciseNext` reordena los `Exercise.order` y **preserva lo ya registrado**.
 - [ ] **I-13** `bringExerciseNext` sobre el ejercicio actual → no-op. Durante `.resting` → reubica
       el índice pero **no cambia la fase**.
@@ -347,6 +355,10 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
 - [ ] **I-19** `apply(_ command:)` produce **la misma transición** que el método directo, para cada
       `LiveSessionCommand`. Ignora comandos con otro `sessionID`. ⚠️ `apply(.goBack)` desde `.done`
       **resucita** la sesión a `.logging`.
+- [ ] **I-20** ⚠️ **Hallazgo de I-11:** `loggedSetsCount` —lo que la Live Activity muestra como
+      "series cargadas"— cuenta series **con datos** (`reps != nil || weight != nil`), y el
+      prellenado ya les pone las reps objetivo. O sea: cuenta la serie actual, todavía sin
+      confirmar. Arranca la sesión en 1, no en 0. Verificar si es lo que se quiso.
 - [ ] **I-20** `makeSnapshot` refleja fase, índice, progreso y pulso; `restEndDate` solo en
       `.resting`. Round-trip por `LiveSessionWire` → snapshot equivalente. Cierra el lazo engine ↔
       serialización.

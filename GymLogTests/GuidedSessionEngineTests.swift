@@ -883,4 +883,134 @@ struct GuidedSessionEngineTests {
         #expect(engine.index == 0)
         #expect(descansosTerminados == 1, "Emite el efecto igual, aunque no había descanso")
     }
+
+    // MARK: - I-11
+
+    // ⚠️ **Bug 5.** `skipRest()` **no valida la fase**: es literalmente `onRestEnded` +
+    // `advance()`. Llamado fuera del descanso, `advance()` mueve el índice igual — y como
+    // saltearse el descanso y saltearse la serie son la misma operación, en `.logging` te
+    // comés una serie entera sin registrarla.
+    //
+    // **No es alcanzable hoy** (ver el último test de la sección): las tres UIs solo
+    // muestran el botón dentro de la vista de descanso, y `apply(_:)` lo protege con un
+    // `if`. Pero el método es `public` y el agujero está a un call site de distancia, así
+    // que los tests quedan de guardia.
+
+    @Test("I-11 · ⚠️ skipRest en fase de carga saltea la serie sin registrarla")
+    func skipRestWhileLoggingSkipsTheSet() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        #expect(engine.phase == .logging)
+
+        engine.skipRest()
+
+        // Avanzó igual, sin descanso de por medio y sin pasar por `completeCurrent`.
+        #expect(engine.index == 1)
+        #expect(engine.currentStep?.setNumber == 2)
+
+        // Y la serie 1 quedó sin marcar: al retomar la sesión `firstIncompleteIndex` va a
+        // mandar al usuario de vuelta a ella. La serie no se "perdió" en el sentido de
+        // borrarse — se perdió en el sentido de que la sesión siguió de largo sin ella.
+        #expect(!day.orderedExercises[0].orderedSets[0].isDone)
+
+        // ⚠️ Hallazgo aparte: `loggedSetsCount` **no** sirve para detectar esto, porque
+        // no cuenta series confirmadas sino series "con datos" (`reps != nil || weight
+        // != nil`) — y el prellenado ya les puso las reps objetivo. Acá da 2 (la serie
+        // salteada y la actual) sin que el usuario haya confirmado ninguna. Es el número
+        // que la Live Activity muestra como "series cargadas". Ver I-20.
+        #expect(engine.loggedSetsCount == 2, "Cuenta las prellenadas, no las confirmadas")
+    }
+
+    @Test("I-11 · ⚠️ skipRest en la última serie deja la sesión en un callejón sin salida")
+    func skipRestOnTheLastSetStrandsTheSession() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Llega a la última serie (índice 4 de 5) por el camino normal.
+        for _ in 0..<4 {
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+        #expect(engine.index == 4)
+        #expect(engine.isLastStep)
+        #expect(engine.phase == .logging)
+
+        engine.skipRest()
+
+        // Este es el peor caso del bug 5, y es peor que saltearse una serie: el índice se
+        // va **fuera del arreglo**. `advance()` no valida el borde y `finish()` nunca se
+        // llama, así que la sesión queda ni cargando ni terminada.
+        #expect(engine.index == 5)
+        #expect(engine.currentStep == nil)
+        #expect(engine.phase == .logging, "No terminó: `finish()` solo se llama desde `completeCurrent`")
+        #expect(day.isCompleted == false)
+
+        // Y no hay forma de salir hacia adelante: `completeCurrent` arranca con un
+        // `guard let step = currentStep` y se va sin hacer nada. La sesión queda
+        // colgada — la única salida es volver atrás.
+        engine.completeCurrent()
+        #expect(engine.index == 5)
+        #expect(engine.phase == .logging)
+
+        engine.goBackFromLogging()
+        #expect(engine.index == 4)
+        #expect(engine.currentStep != nil, "Volver atrás es la única salida del callejón")
+    }
+
+    @Test("I-11 · ⚠️ skipRest después de terminar revive la sesión")
+    func skipRestAfterFinishingResurrectsTheSession() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        for _ in 0..<4 {
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+        engine.completeCurrent()
+        #expect(engine.phase == .done)
+        #expect(day.isCompleted)
+
+        engine.skipRest()
+
+        // La misma falta de validación, del otro lado: `advance()` pisa la fase `.done`
+        // con `.logging`. La pantalla de "sesión terminada" se iría, y quedaría el mismo
+        // callejón sin salida del test anterior (el día sí queda completado, eso no se
+        // revierte).
+        #expect(engine.phase == .logging, "⚠️ Deshizo el `.done`")
+        #expect(engine.currentStep == nil)
+        #expect(day.isCompleted, "Al menos el día sigue completado")
+    }
+
+    @Test("I-11 · El comando remoto sí valida la fase: por eso el bug no es alcanzable")
+    func theRemoteCommandGuardsThePhase() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.beginLiveSession()
+        #expect(engine.phase == .logging)
+
+        // Este es el camino por el que un `skipRest` podría llegar en un momento
+        // inesperado: el botón de la Live Activity dibuja un snapshot que puede estar
+        // viejo, así que el iPhone puede mandar "saltear descanso" cuando el reloj ya
+        // salió del descanso. `apply(_:)` lo filtra al recibirlo.
+        engine.apply(LiveSessionCommand(sessionID: engine.sessionID, action: .skipRest))
+
+        #expect(engine.index == 0, "El comando se descartó: la fase no era `.resting`")
+        #expect(!day.orderedExercises[0].orderedSets[0].isDone)
+
+        // Esa guarda es lo único que separa al bug 5 de ser un bug de verdad. Si alguien
+        // agrega un call site nuevo fuera de la vista de descanso, los tests de arriba
+        // dicen exactamente qué se rompe.
+    }
 }
