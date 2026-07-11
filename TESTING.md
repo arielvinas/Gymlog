@@ -31,7 +31,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 |---|---|---|
 | 1 | **`StrengthSeed.templates(for:)` matchea `title.contains("b")` sobre el título en minúsculas** → cualquier día con una "b" en cualquier parte ("Gimnasio **b**ásico", "Fuerza A · **B**loque") recibe la rutina del **Día B**. | U-18 |
 | 2 | **`StreakCalculator.currentWeekStreak` agrupa por `weekTitle` (String), no por semana calendario** → dos semanas con el mismo título se fusionan; una semana partida en dos títulos cuenta doble. | U-32 |
-| 3 | **`GuidedSessionEngine`: con `restSeconds == 0`, `onStateChanged` nunca se emite al entrar en tiempo extra** → el iPhone y la Live Activity no se enteran, no pintan rojo. | I-06 |
+| 3 | ~~**`GuidedSessionEngine`: con `restSeconds == 0`, `onStateChanged` nunca se emite al entrar en tiempo extra**~~ → **confirmado pero NO alcanzable.** El 0 no se puede producir hoy por ninguna ruta. Agujero de la lógica, no bug visible. Ver I-06. | I-06 ✅ |
 | 4 | **Ráfaga de alertas al volver de background:** si el timer se pausa y vuelve con `restOvertime = 35`, `nextOvertimeAlert` salta a 10 (no a 40) → los 3 ticks siguientes disparan 3 vibraciones seguidas. | I-07 |
 | 5 | **`skipRest()` no valida la fase** → llamado en `.logging` avanza igual, **salteándose una serie entera**. | I-11 |
 | 6 | **`bringExerciseNext` no valida que el ejercicio pertenezca al día** → reordena los `order` de los demás para nada. | I-14 |
@@ -289,8 +289,16 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       vencimiento no mueven la sesión ni un paso; solo `skipRest` avanza. Si avanzara solo, el reloj
       daría por empezada una serie que el usuario todavía no arrancó, y las reps y el peso quedarían
       asignados al momento equivocado.
-- [ ] **I-06** ⚠️ **Bug 3.** Con `restSeconds == 0`, `onStateChanged` **nunca se emite** al entrar
-      en tiempo extra → el iPhone no se entera.
+- [x] **I-06** ⚠️ **Bug 3 — confirmado, pero NO alcanzable.** ✅ Con `restSeconds == 0`,
+      `onStateChanged` nunca se emite al entrar en tiempo extra (`enteringOvertime = restRemaining > 0`
+      no se cumple si ya arrancó en 0), así que el iPhone y la Live Activity no pintan el rojo.
+      **Corrección de severidad:** el 0 **no es alcanzable hoy** — las plantillas usan 30-120 s,
+      `adjustRest` clampea el total a un mínimo de 15, y ninguna vista escribe `restSeconds = 0`. Es
+      un agujero de la lógica del engine, no un bug que el usuario pueda ver. El test queda como
+      guardia: el día que se agregue una plantilla sin descanso (una superserie), se vuelve real.
+      También queda fijado el caso normal: el cruce a tiempo extra avisa **exactamente una vez**, y
+      los ticks con descanso restante **no** avisan (inundar WatchConnectivity con un snapshot por
+      tick sería carísimo; la cuenta regresiva la dibuja cada cliente desde `restEndDate`).
 - [ ] **I-07** ⚠️ **Bug 4.** Ráfaga de alertas: volver de background con `restOvertime = 35` dispara
       una sola alerta y deja `nextOvertimeAlert` en 10 → los 3 ticks siguientes vibran seguido.
 - [ ] **I-08** `adjustRest(±15)` mueve `restEndDate`, no lo deja en negativo, y **persiste

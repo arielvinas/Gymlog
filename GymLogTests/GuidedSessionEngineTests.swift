@@ -446,4 +446,73 @@ struct GuidedSessionEngineTests {
         #expect(engine.restRemaining == 1)
         #expect(!engine.isRestOvertime)
     }
+
+    // MARK: - I-06
+
+    @Test("I-06 · Entrar en tiempo extra avisa al iPhone una sola vez")
+    func enteringOvertimeNotifiesTheMirrorExactlyOnce() throws {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.completeCurrent()
+
+        // A partir de acá contamos solo los avisos del cronómetro.
+        var cambios = 0
+        engine.onStateChanged = { cambios += 1 }
+        let fin = try #require(engine.restEndDate)
+
+        // Ticks mientras todavía queda descanso: no avisan (la cuenta regresiva la
+        // dibuja cada cliente solo, a partir de `restEndDate`; inundar el canal de
+        // WatchConnectivity con un snapshot por tick sería carísimo).
+        engine.tickRest(now: fin.addingTimeInterval(-30))
+        engine.tickRest(now: fin.addingTimeInterval(-10))
+        #expect(cambios == 0)
+
+        // El cruce a tiempo extra sí: el iPhone tiene que pintar el descanso en rojo.
+        engine.tickRest(now: fin.addingTimeInterval(1))
+        #expect(cambios == 1)
+
+        // Y los ticks siguientes de tiempo extra no repiten el aviso.
+        engine.tickRest(now: fin.addingTimeInterval(5))
+        engine.tickRest(now: fin.addingTimeInterval(15))
+        #expect(cambios == 1, "El cruce a tiempo extra avisa una sola vez")
+    }
+
+    @Test("I-06 · ⚠️ Con descanso de 0 s, el iPhone nunca se entera del tiempo extra")
+    func zeroSecondRestNeverNotifiesOvertime() throws {
+        // ⚠️ **Documenta el bug 3, que hoy NO es alcanzable.**
+        //
+        // `tickRest` decide si avisar con `enteringOvertime = restRemaining > 0`. Con un
+        // descanso de 0 s, `restRemaining` ya arranca en 0, así que la condición nunca
+        // se cumple y **`onStateChanged` no se emite jamás**: el iPhone y la Live
+        // Activity no pintan el rojo del tiempo extra.
+        //
+        // Hoy no muerde: las plantillas usan 30–120 s, `adjustRest` clampea el total a
+        // un mínimo de 15, y ninguna vista escribe `restSeconds = 0`. O sea que es un
+        // agujero de la lógica del engine, no un bug que el usuario pueda ver.
+        //
+        // El test existe como guardia: el día que alguien agregue una plantilla sin
+        // descanso (un superserie, por ejemplo), esto se convierte en un bug real y
+        // este test es el que lo explica.
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, in: db.context)
+        makeExercise("Superserie", on: day, order: 0, restSeconds: 0,
+                     sets: [(nil, nil), (nil, nil)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.completeCurrent()
+        #expect(engine.phase == .resting)
+
+        var cambios = 0
+        engine.onStateChanged = { cambios += 1 }
+        let fin = try #require(engine.restEndDate)
+
+        engine.tickRest(now: fin.addingTimeInterval(10))
+
+        #expect(engine.isRestOvertime, "Sí entra en tiempo extra…")
+        #expect(cambios == 0, "…pero no avisa. Comportamiento actual, no el deseado")
+    }
 }
