@@ -37,4 +37,36 @@ struct PlannedDistanceTests {
     func parsesASingleDistance(text: String, expected: Double) {
         #expect(PlannedDistance.parse(text) == expected)
     }
+
+    // MARK: - U-02
+
+    // Un rango ("13-14 km") es una banda de objetivo, no dos números: el plan la
+    // resuelve tomando el **promedio**. Esa decisión es la que hace que los km
+    // planificados de la semana no dependan de si el día se escribió con rango o
+    // con un número redondo.
+
+    @Test(
+        "U-02 · Un rango se promedia",
+        arguments: [
+            ("Fondo 13-14 km", 13.5),
+            ("Fondo 10-12 km", 11.0),
+            // Guion largo (en-dash): es el que mete la sustitución automática de
+            // iOS al tipear "13-14" en el campo de detalle.
+            ("Fondo 13–14 km", 13.5),
+            // Con espacios alrededor del guion.
+            ("Fondo 13 - 14 km", 13.5),
+            // Rango con decimales.
+            ("Fondo 12,5-13,5 km", 13.0),
+        ]
+    )
+    func averagesARange(text: String, expected: Double) {
+        #expect(PlannedDistance.parse(text) == expected)
+    }
+
+    @Test("U-02 · Un rango invertido igual promedia")
+    func invertedRangeStillAverages() {
+        // El parser no valida el orden. "14-13" da lo mismo que "13-14", que es lo
+        // razonable: el promedio es simétrico y no hay razón para tratarlo como error.
+        #expect(PlannedDistance.parse("Fondo 14-13 km") == 13.5)
+    }
 }
