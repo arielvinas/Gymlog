@@ -344,8 +344,12 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       La parte que importa: `buildSteps` rearma los pasos desde cero, así que el engine tiene que
       **reencontrar** al usuario en su serie. Lo hace buscando la misma `ExerciseSet` **por
       identidad**, no por índice — si fuera por índice, reordenar te movería de serie.
-- [ ] **I-13** `bringExerciseNext` sobre el ejercicio actual → no-op. Durante `.resting` → reubica
-      el índice pero **no cambia la fase**.
+- [x] **I-13** `bringExerciseNext` sobre el ejercicio actual → no-op silencioso (sale por el
+      `guard` **antes** de tocar los `order`; además `switchableExercises` ni lo ofrece). Durante
+      `.resting` reubica el índice, **no cambia la fase y no toca el cronómetro**: misma
+      `restEndDate`, sin `onRestEnded` ni `onRestStarted`. ✅
+      Es el momento real de uso —elegís el próximo ejercicio *mientras* descansás— así que cortar
+      o reiniciar el descanso ahí sería el peor efecto posible. Lo único que cambia es el "Sigue".
 - [ ] **I-14** ⚠️ **Bug 6.** `bringExerciseNext` con un ejercicio que **no pertenece al día** →
       reordena a los demás para nada, sin guard.
 - [ ] **I-15** Retomar una sesión a medias arranca en la primera serie incompleta. ⚠️ **Si están

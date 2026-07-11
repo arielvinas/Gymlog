@@ -1139,4 +1139,122 @@ struct GuidedSessionEngineTests {
         #expect(day.orderedExercises.map(\.name) == ["Press banca", "Remo", "Sentadilla"])
         #expect(engine.index == 0)
     }
+
+    // MARK: - I-13
+
+    // El momento real de uso es **durante el descanso**: terminaste una serie, estás
+    // esperando, ves que la máquina del que sigue está ocupada y elegís otro. Por eso lo
+    // que importa acá es que reordenar **no toque el cronómetro**: si cortara el descanso,
+    // elegir el próximo ejercicio te costaría el descanso que estabas haciendo.
+
+    @Test("I-13 · Reordenar durante el descanso no corta el descanso")
+    func reorderingDuringRestDoesNotStopTheRest() throws {
+        let db = TestDB()
+        let day = dayWithThreeExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var descansosTerminados = 0
+        var descansosArrancados = 0
+        engine.onRestEnded = { descansosTerminados += 1 }
+        engine.onRestStarted = { _ in descansosArrancados += 1 }
+        engine.start(day: day, context: db.context)
+
+        engine.completeCurrent()
+        #expect(engine.phase == .resting)
+        let finDelDescanso = try #require(engine.restEndDate)
+        descansosArrancados = 0
+
+        engine.bringExerciseNext(day.orderedExercises[2])
+
+        // La fase y el cronómetro quedan intactos: misma fecha de fin, mismos segundos.
+        // Ni se corta ni se reinicia.
+        #expect(engine.phase == .resting)
+        #expect(engine.restEndDate == finDelDescanso)
+        #expect(engine.restTotal == 60)
+        #expect(descansosTerminados == 0, "Cortar el descanso acá sería el peor efecto posible")
+        #expect(descansosArrancados == 0, "Y reiniciarlo, el segundo peor")
+
+        // El reordenado sí pasó.
+        #expect(day.orderedExercises.map(\.name) == ["Press banca", "Sentadilla", "Remo"])
+    }
+
+    @Test("I-13 · Reordenar durante el descanso reubica el índice sin mover al usuario")
+    func reorderingDuringRestRelocatesTheIndex() throws {
+        let db = TestDB()
+        let day = dayWithThreeExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Va hasta la **última** serie del press y la completa: recién ahí el "Sigue" es
+        // otro ejercicio, que es el caso donde traer uno nuevo tiene sentido.
+        engine.completeCurrent()
+        engine.skipRest()
+        let ultimaSerieDelPress = try #require(engine.currentStep?.set)
+        engine.completeCurrent()
+
+        #expect(engine.phase == .resting)
+        #expect(engine.index == 1)
+        #expect(engine.nextStep?.exercise.name == "Remo")
+
+        engine.bringExerciseNext(day.orderedExercises[2])
+
+        // El índice se recalcula sobre los pasos nuevos, pero apunta a la misma serie
+        // (la que se acaba de completar). El usuario no se movió.
+        #expect(engine.index == 1)
+        #expect(engine.currentStep?.set === ultimaSerieDelPress)
+        #expect(engine.currentStep?.set?.isDone == true)
+
+        // Lo único que cambió es lo que viene: la sentadilla, no el remo. Es exactamente
+        // lo que el usuario pidió, y es lo que la UI muestra como "Sigue".
+        #expect(engine.nextStep?.exercise.name == "Sentadilla")
+
+        // Y al cortar el descanso cae en el ejercicio nuevo.
+        engine.skipRest()
+        #expect(engine.currentStep?.exercise.name == "Sentadilla")
+        #expect(engine.phase == .logging)
+    }
+
+    @Test("I-13 · Traer el ejercicio actual es un no-op silencioso")
+    func bringingTheCurrentExerciseIsANoOp() {
+        let db = TestDB()
+        let day = dayWithThreeExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        var cambios = 0
+        engine.onStateChanged = { cambios += 1 }
+
+        let press = day.orderedExercises[0]
+        engine.bringExerciseNext(press)
+
+        // Sale por el `guard exercise !== currentExercise`. Importa que salga **antes** de
+        // reasignar los `order`: moverse a sí mismo "justo después de sí mismo" es un
+        // pedido incoherente, y el algoritmo (sacar de la lista, insertar tras el actual)
+        // no está definido para ese caso.
+        #expect(day.orderedExercises.map(\.name) == ["Press banca", "Remo", "Sentadilla"])
+        #expect(engine.index == 0)
+        #expect(cambios == 0)
+    }
+
+    @Test("I-13 · La UI no ofrece el actual ni los ejercicios ya terminados")
+    func switchableExercisesExcludesCurrentAndFinished() {
+        let db = TestDB()
+        let day = dayWithThreeExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // `switchableExercises` es la lista que la UI muestra en "Cambiar ejercicio": es
+        // la que impide que el no-op de arriba sea siquiera alcanzable desde un botón.
+        #expect(engine.switchableExercises.map(\.name) == ["Remo", "Sentadilla"])
+
+        // Un ejercicio con todas sus series hechas deja de ser candidato: traerlo al
+        // frente no haría nada útil (no tiene series pendientes que hacer).
+        let remo = day.orderedExercises[1]
+        for serie in remo.orderedSets { serie.isDone = true }
+
+        #expect(engine.switchableExercises.map(\.name) == ["Sentadilla"])
+    }
 }
