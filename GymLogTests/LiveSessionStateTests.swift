@@ -46,6 +46,34 @@ struct LiveSessionStateTests {
         )
     }
 
+    /// Snapshot con **todos los opcionales en `nil`**: el estado real de una serie
+    /// de peso corporal recién empezada, sin nada cargado y sin reloj puesto.
+    private func snapshotWithNoOptionals() -> LiveSessionSnapshot {
+        LiveSessionSnapshot(
+            sessionID: UUID(uuidString: "3F2504E0-4F89-11D3-9A0C-0305E82C3301")!,
+            dayDate: date(2026, 7, 1),
+            phase: .logging,
+            exerciseName: "Plancha",
+            exerciseIndex: 0,
+            exerciseCount: 5,
+            setNumber: 0,
+            setCount: 0,
+            targetReps: nil,
+            isBodyweight: true,
+            isTimeBased: true,
+            weight: nil,
+            reps: nil,
+            restEndDate: nil,
+            restTotal: 0,
+            isOvertime: false,
+            heartRate: nil,
+            progressFraction: 0,
+            loggedSetsCount: 0,
+            totalVolume: 0,
+            updatedAt: date(2026, 7, 3)
+        )
+    }
+
     // MARK: - U-12
 
     @Test("U-12 · Round-trip de un snapshot completo")
@@ -56,5 +84,26 @@ struct LiveSessionStateTests {
         let decoded = try JSONDecoder().decode(LiveSessionSnapshot.self, from: data)
 
         #expect(decoded == original)
+    }
+
+    // MARK: - U-13
+
+    @Test("U-13 · Round-trip con todos los opcionales en nil")
+    func snapshotRoundTripsWithAllOptionalsNil() throws {
+        let original = snapshotWithNoOptionals()
+
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(LiveSessionSnapshot.self, from: data)
+
+        #expect(decoded == original)
+
+        // Los opcionales tienen que volver como `nil`, no como valores por defecto:
+        // un `weight` que vuelva en 0 haría que el iPhone dibuje "0 kg" donde el
+        // reloj no mostraba nada.
+        #expect(decoded.targetReps == nil)
+        #expect(decoded.weight == nil)
+        #expect(decoded.reps == nil)
+        #expect(decoded.restEndDate == nil)
+        #expect(decoded.heartRate == nil)
     }
 }

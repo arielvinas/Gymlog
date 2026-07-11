@@ -160,7 +160,7 @@ ya encapsula el encode/decode. Cero refactor, y protege el contrato reloj↔iPho
 ninguna red.
 
 - [x] **U-12** Round-trip de un `LiveSessionSnapshot` completo. ✅
-- [ ] **U-13** Round-trip con todos los opcionales en `nil`.
+- [x] **U-13** Round-trip con todos los opcionales en `nil`. ✅
 - [ ] **U-14** Round-trip de `LiveSessionAction.adjustRest(±15)` — el caso con valor asociado, el
       más frágil ante un rename. Y cada `case` restante.
 - [ ] **U-15** `LiveSessionWire.payload(for:)` → `snapshot(from:)` devuelve un snapshot igual.
