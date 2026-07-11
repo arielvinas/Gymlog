@@ -515,4 +515,60 @@ struct GuidedSessionEngineTests {
         #expect(engine.isRestOvertime, "Sí entra en tiempo extra…")
         #expect(cambios == 0, "…pero no avisa. Comportamiento actual, no el deseado")
     }
+
+    // MARK: - I-07
+
+    @Test("I-07 · En tiempo extra, el aviso se repite cada 10 s")
+    func overtimeAlertRepeatsEveryTenSeconds() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        var avisos = 0
+        engine.onRestAlert = { avisos += 1 }
+
+        // La UI llama a `tickRest` unas 5-10 veces por segundo (0,1 s en iPhone,
+        // 0,2 s en el reloj). Simulamos ese goteo: 40 s de tiempo extra.
+        for decima in 0...400 {
+            engine.tickRest(now: fin.addingTimeInterval(TimeInterval(decima) / 10))
+        }
+
+        // Avisos en 0, 10, 20, 30 y 40 s: cinco vibraciones, bien espaciadas.
+        #expect(avisos == 5)
+    }
+
+    @Test("I-07 · ⚠️ Al volver de background, el aviso se dispara en ráfaga")
+    func returningFromBackgroundFiresABurstOfAlerts() throws {
+        // ⚠️ **Documenta el bug 4. Este SÍ es alcanzable** — basta con que la app se
+        // suspenda durante un descanso, que es cosa de todos los días (bajás la muñeca,
+        // el reloj apaga la pantalla y deja de tickear).
+        //
+        // `tickRest` avisa cuando `restOvertime >= nextOvertimeAlert` y después hace
+        // `nextOvertimeAlert += 10`. El `+=` asume que los ticks vienen seguidos: da un
+        // paso de 10 por vez. Si la app estuvo suspendida y vuelve con 35 s de tiempo
+        // extra encima, el contador arranca en 0 y tiene que **remontar** — y como cada
+        // tick solo lo sube 10, hacen falta varios ticks para alcanzarlo. Cada uno de
+        // esos ticks dispara su propia vibración.
+        //
+        // Resultado: cuatro vibraciones en menos de un segundo, en vez de una.
+        //
+        // El arreglo natural es saltar `nextOvertimeAlert` directo al próximo múltiplo
+        // de 10 por encima del `restOvertime` actual, en vez de incrementarlo de a 10.
+        // No lo aplico acá: el fix va en un commit aparte.
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        var avisos = 0
+        engine.onRestAlert = { avisos += 1 }
+
+        // La app estuvo suspendida: ni un tick durante el descanso ni los primeros 35 s
+        // de tiempo extra. Vuelve, y el timer retoma su goteo normal.
+        for decima in 350...360 {
+            engine.tickRest(now: fin.addingTimeInterval(TimeInterval(decima) / 10))
+        }
+
+        #expect(
+            avisos == 4,
+            "Comportamiento actual: ráfaga de 4 vibraciones al volver. Lo correcto sería 1"
+        )
+    }
 }

@@ -32,7 +32,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 1 | **`StrengthSeed.templates(for:)` matchea `title.contains("b")` sobre el título en minúsculas** → cualquier día con una "b" en cualquier parte ("Gimnasio **b**ásico", "Fuerza A · **B**loque") recibe la rutina del **Día B**. | U-18 |
 | 2 | **`StreakCalculator.currentWeekStreak` agrupa por `weekTitle` (String), no por semana calendario** → dos semanas con el mismo título se fusionan; una semana partida en dos títulos cuenta doble. | U-32 |
 | 3 | ~~**`GuidedSessionEngine`: con `restSeconds == 0`, `onStateChanged` nunca se emite al entrar en tiempo extra**~~ → **confirmado pero NO alcanzable.** El 0 no se puede producir hoy por ninguna ruta. Agujero de la lógica, no bug visible. Ver I-06. | I-06 ✅ |
-| 4 | **Ráfaga de alertas al volver de background:** si el timer se pausa y vuelve con `restOvertime = 35`, `nextOvertimeAlert` salta a 10 (no a 40) → los 3 ticks siguientes disparan 3 vibraciones seguidas. | I-07 |
+| 4 | **Ráfaga de alertas al volver de background.** ✅ **CONFIRMADO** en I-07: vuelve con 35 s de tiempo extra → **4 vibraciones en <1 s**. Alcanzable a diario (el reloj apaga la pantalla y deja de tickear). **Pendiente de arreglar.** | I-07 ✅ |
 | 5 | **`skipRest()` no valida la fase** → llamado en `.logging` avanza igual, **salteándose una serie entera**. | I-11 |
 | 6 | **`bringExerciseNext` no valida que el ejercicio pertenezca al día** → reordena los `order` de los demás para nada. | I-14 |
 | 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series puntúa **0** y `cleanupKneeRecovery` **lo borra**. | I-30 |
@@ -299,8 +299,15 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       También queda fijado el caso normal: el cruce a tiempo extra avisa **exactamente una vez**, y
       los ticks con descanso restante **no** avisan (inundar WatchConnectivity con un snapshot por
       tick sería carísimo; la cuenta regresiva la dibuja cada cliente desde `restEndDate`).
-- [ ] **I-07** ⚠️ **Bug 4.** Ráfaga de alertas: volver de background con `restOvertime = 35` dispara
-      una sola alerta y deja `nextOvertimeAlert` en 10 → los 3 ticks siguientes vibran seguido.
+- [x] **I-07** ⚠️ **Bug 4 — CONFIRMADO y alcanzable.** ✅ Volver de background con 35 s de tiempo
+      extra encima dispara **4 vibraciones en menos de un segundo**, en vez de una.
+      **Causa:** `tickRest` avisa si `restOvertime >= nextOvertimeAlert` y después hace
+      `nextOvertimeAlert += 10`. El `+=` asume ticks seguidos: sube de a 10 por vez. Si la app
+      estuvo suspendida, el contador arranca en 0 y tiene que **remontar** — y cada tick del remonte
+      dispara su propia vibración.
+      **Alcanzable todos los días:** bajás la muñeca, el reloj apaga la pantalla y deja de tickear.
+      **Fix propuesto:** saltar `nextOvertimeAlert` al próximo múltiplo de 10 por encima del
+      `restOvertime` actual, en vez de incrementarlo de a 10. **Pendiente de aplicar** (commit aparte).
 - [ ] **I-08** `adjustRest(±15)` mueve `restEndDate`, no lo deja en negativo, y **persiste
       `exercise.restSeconds`** (ojo: cambia la preferencia del ejercicio, no solo este descanso).
 - [ ] **I-09** `goBackFromLogging` vuelve atrás y **des-marca** la serie. En `index == 0` es no-op
