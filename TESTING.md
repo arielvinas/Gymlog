@@ -339,7 +339,11 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       **No es alcanzable**: las tres UIs solo muestran el botón dentro de la vista de descanso y
       `apply(.skipRest)` valida `phase == .resting`. Esa guarda es lo único que lo separa de ser
       un bug real. Los tests quedan de guardia para el día que aparezca un call site nuevo.
-- [ ] **I-12** `bringExerciseNext` reordena los `Exercise.order` y **preserva lo ya registrado**.
+- [x] **I-12** `bringExerciseNext` reordena los `Exercise.order` (0..n, persistidos: sobreviven a
+      rearmar la sesión) y **preserva lo ya registrado**. ✅
+      La parte que importa: `buildSteps` rearma los pasos desde cero, así que el engine tiene que
+      **reencontrar** al usuario en su serie. Lo hace buscando la misma `ExerciseSet` **por
+      identidad**, no por índice — si fuera por índice, reordenar te movería de serie.
 - [ ] **I-13** `bringExerciseNext` sobre el ejercicio actual → no-op. Durante `.resting` → reubica
       el índice pero **no cambia la fase**.
 - [ ] **I-14** ⚠️ **Bug 6.** `bringExerciseNext` con un ejercicio que **no pertenece al día** →

@@ -43,6 +43,23 @@ struct GuidedSessionEngineTests {
         return day
     }
 
+    /// Un día con tres ejercicios de 2 series cada uno. Con dos no alcanza para probar
+    /// el reordenado: hace falta un tercero para que "traer al siguiente" tenga a dónde
+    /// mover algo.
+    @MainActor
+    private func dayWithThreeExercises(in context: ModelContext) -> WorkoutDay {
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, title: "Fuerza A", in: context)
+        for (i, nombre) in ["Press banca", "Remo", "Sentadilla"].enumerated() {
+            makeExercise(
+                nombre, on: day, order: i,
+                targetReps: "8", restSeconds: 60,
+                sets: [(nil, nil), (nil, nil)],
+                in: context
+            )
+        }
+        return day
+    }
+
     // MARK: - I-01
 
     @Test("I-01 · start arma un paso por cada serie de cada ejercicio")
@@ -1012,5 +1029,114 @@ struct GuidedSessionEngineTests {
         // Esa guarda es lo único que separa al bug 5 de ser un bug de verdad. Si alguien
         // agrega un call site nuevo fuera de la vista de descanso, los tests de arriba
         // dicen exactamente qué se rompe.
+    }
+
+    // MARK: - I-12
+
+    // "Traer al siguiente" resuelve un problema del gimnasio, no del software: la máquina
+    // del ejercicio que venía está ocupada, así que se intercala otro del plan. Es la única
+    // operación que **reordena el modelo en caliente**, en el medio de una sesión con datos
+    // ya cargados — de ahí que lo importante no sea el orden nuevo sino lo que NO se toca.
+
+    @Test("I-12 · Traer un ejercicio al siguiente lo mueve justo después del actual")
+    func bringingAnExerciseNextReordersTheDay() {
+        let db = TestDB()
+        let day = dayWithThreeExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var cambios = 0
+        engine.start(day: day, context: db.context)
+        engine.onStateChanged = { cambios += 1 }
+
+        let sentadilla = day.orderedExercises[2]
+        engine.bringExerciseNext(sentadilla)
+
+        // La sentadilla salta del último lugar al segundo: queda justo detrás del press,
+        // que es el que se está haciendo.
+        #expect(day.orderedExercises.map(\.name) == ["Press banca", "Sentadilla", "Remo"])
+        #expect(cambios == 1)
+    }
+
+    @Test("I-12 · El orden nuevo queda persistido en el modelo, no solo en los pasos")
+    func theNewOrderIsPersisted() {
+        let db = TestDB()
+        let day = dayWithThreeExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.bringExerciseNext(day.orderedExercises[2])
+
+        // `orderedExercises` ordena por el campo `order`, así que si el engine solo
+        // reacomodara su arreglo de pasos, el cambio se perdería al cerrar la sesión —
+        // y peor, el día quedaría con `order` duplicados. Se reasignan los tres, 0..2.
+        let porNombre = Dictionary(uniqueKeysWithValues: day.orderedExercises.map { ($0.name, $0.order) })
+        #expect(porNombre["Press banca"] == 0)
+        #expect(porNombre["Sentadilla"] == 1)
+        #expect(porNombre["Remo"] == 2)
+
+        // Y sobrevive a rearmar la sesión desde cero (lee del modelo, no de memoria).
+        let retomado = GuidedSessionEngine()
+        retomado.start(day: day, context: db.context)
+        #expect(retomado.steps.map(\.exercise.name) == [
+            "Press banca", "Press banca", "Sentadilla", "Sentadilla", "Remo", "Remo",
+        ])
+    }
+
+    @Test("I-12 · Reordenar no pierde lo ya registrado ni mueve al usuario de su serie")
+    func reorderingPreservesLoggedDataAndPosition() throws {
+        let db = TestDB()
+        let day = dayWithThreeExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Carga la primera serie del press con datos reales y la confirma.
+        let press = day.orderedExercises[0]
+        press.orderedSets[0].weight = 60
+        press.orderedSets[0].reps = 8
+        engine.completeCurrent()
+        engine.skipRest()
+
+        // Ahora está en la serie 2 del press. Acá es donde el usuario ve que la máquina
+        // del remo está ocupada y trae la sentadilla.
+        #expect(engine.currentStep?.exercise.name == "Press banca")
+        #expect(engine.currentStep?.setNumber == 2)
+        let serieActual = try #require(engine.currentStep?.set)
+
+        engine.bringExerciseNext(day.orderedExercises[2])
+
+        // Esto es lo que hace que la operación sea segura: `buildSteps` rearma los pasos
+        // desde cero, así que el engine tiene que **reencontrar** al usuario. Lo hace
+        // buscando la misma `ExerciseSet` por identidad, no por índice — si buscara por
+        // índice, el usuario aparecería en otra serie después de reordenar.
+        #expect(engine.currentStep?.exercise.name == "Press banca")
+        #expect(engine.currentStep?.setNumber == 2)
+        #expect(engine.currentStep?.set === serieActual)
+        #expect(engine.phase == .logging)
+
+        // Y lo registrado sigue ahí: el reordenado toca `order`, nunca los datos.
+        #expect(press.orderedSets[0].isDone)
+        #expect(press.orderedSets[0].weight == 60)
+        #expect(press.orderedSets[0].reps == 8)
+
+        // El que cambia es lo que sigue: al terminar el press ahora viene la sentadilla.
+        engine.completeCurrent()
+        engine.skipRest()
+        #expect(engine.currentStep?.exercise.name == "Sentadilla")
+    }
+
+    @Test("I-12 · Traer un ejercicio que ya estaba justo detrás no cambia nada")
+    func bringingTheAlreadyNextExerciseIsANoOp() {
+        let db = TestDB()
+        let day = dayWithThreeExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // El remo ya es el que sigue. Traerlo "al siguiente" es pedir lo que ya pasa.
+        engine.bringExerciseNext(day.orderedExercises[1])
+
+        #expect(day.orderedExercises.map(\.name) == ["Press banca", "Remo", "Sentadilla"])
+        #expect(engine.index == 0)
     }
 }
