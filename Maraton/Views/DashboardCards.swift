@@ -38,26 +38,34 @@ struct ConsistencyCard: View {
     }
 }
 
-// MARK: - P3: Proyección actual
+// MARK: - P3: Tendencia de volumen
 
-struct ProjectionCard: View {
-    let projection: RaceProjection?
+struct VolumeTrendCard: View {
+    let weeks: [WeekVolume]
+
+    private var maxKm: Double { max(weeks.map(\.runKm).max() ?? 0, 1) }
+    private var maxTonnage: Double { max(weeks.map(\.tonnage).max() ?? 0, 1) }
+    private var hasData: Bool { weeks.contains { $0.runKm > 0 || $0.tonnage > 0 } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            CardHeader(title: "Proyección actual", systemImage: "chart.line.uptrend.xyaxis", tint: .blue)
+            CardHeader(title: "Volumen por semana", systemImage: "chart.bar.fill", tint: .blue)
 
-            if let projection {
-                HStack(spacing: 12) {
-                    projectionBox(distance: "10 km", time: projection.time10kSeconds.formattedRaceTime)
-                    projectionBox(distance: "21,1 km", time: projection.timeHalfSeconds.formattedRaceTime)
+            if hasData {
+                HStack(alignment: .bottom, spacing: 10) {
+                    ForEach(weeks) { week in
+                        weekColumn(week)
+                    }
                 }
 
-                Text("Estimado según tu ritmo de \(projection.basePaceSecPerKm.formattedPace). Es una referencia, no una predicción exacta.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 14) {
+                    legend(color: .blue, text: "km corridos")
+                    legend(color: .purple, text: "kg levantados")
+                }
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             } else {
-                Text("Completá algunas corridas con distancia y duración para ver tu proyección.")
+                Text("Registrá corridas o series de gimnasio para ver tu volumen semanal.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -65,21 +73,34 @@ struct ProjectionCard: View {
         .dashboardCard()
     }
 
-    private func projectionBox(distance: String, time: String) -> some View {
-        VStack(spacing: 4) {
-            Text(distance)
-                .font(.caption)
+    /// Una semana: dos barras (corrida y gimnasio) escaladas a su propio máximo,
+    /// porque km y kg no son comparables entre sí.
+    private func weekColumn(_ week: WeekVolume) -> some View {
+        VStack(spacing: 6) {
+            HStack(alignment: .bottom, spacing: 3) {
+                bar(fraction: week.runKm / maxKm, color: .blue)
+                bar(fraction: week.tonnage / maxTonnage, color: .purple)
+            }
+            .frame(height: 70)
+
+            Text(week.weekStart.dayMonth)
+                .font(.system(size: 9))
                 .foregroundStyle(.secondary)
-            Text(time)
-                .font(.title3.weight(.bold))
-                .monospacedDigit()
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.tertiarySystemFill))
-        )
+    }
+
+    private func bar(fraction: Double, color: Color) -> some View {
+        RoundedRectangle(cornerRadius: 3)
+            .fill(color.gradient)
+            .frame(width: 10, height: max(2, 70 * fraction))
+    }
+
+    private func legend(color: Color, text: String) -> some View {
+        HStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 2).fill(color).frame(width: 8, height: 8)
+            Text(text)
+        }
     }
 }
 

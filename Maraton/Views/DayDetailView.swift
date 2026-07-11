@@ -97,17 +97,7 @@ private struct DetailHeader: View {
                     .font(.system(size: 34, weight: .bold, design: .rounded))
             }
             Spacer()
-            countdownPill
         }
-    }
-
-    private var countdownPill: some View {
-        Label("Córdoba · \(PlanConstants.daysUntilRace()) días", systemImage: "flag.checkered")
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.red)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(Capsule().fill(Color.red.opacity(0.15)))
     }
 }
 
@@ -128,10 +118,9 @@ private struct DayContent: View {
         StreakCalculator.currentWeekStreak(days: allDays, today: day.date)
     }
 
-    /// Proyección de carrera con las corridas registradas hasta ese día.
-    private var projection: RaceProjection? {
-        let runs = RaceProjectionBuilder.samples(from: allDays).filter { $0.date <= day.date }
-        return AveragePaceProjection().project(from: runs, today: day.date)
+    /// Tonelaje de gimnasio de la semana del día seleccionado.
+    private var weekTonnage: Double {
+        WeeklyVolume.tonnage(for: day.date, among: allDays.flatMap(\.orderedExercises))
     }
 
     /// Última corrida registrada hasta el día seleccionado (incluido).
@@ -149,7 +138,7 @@ private struct DayContent: View {
                 weekStreak: weekStreak,
                 weekActualKm: WeeklyVolume.actualKm(for: day.date, among: allDays),
                 weekPlannedKm: WeeklyVolume.plannedKm(for: day.date, among: allDays),
-                projection: projection
+                weekTonnage: weekTonnage
             )
 
             if let lastRun {
@@ -239,7 +228,7 @@ private struct QuickStatsRow: View {
     let weekStreak: Int
     let weekActualKm: Double
     let weekPlannedKm: Double
-    let projection: RaceProjection?
+    let weekTonnage: Double
 
     private var weekValue: String {
         weekPlannedKm > 0
@@ -251,8 +240,8 @@ private struct QuickStatsRow: View {
         HStack(spacing: 12) {
             QuickStat(title: "Racha", value: "\(weekStreak) sem")
             QuickStat(title: "Semana", value: weekValue)
-            QuickStat(title: "Proyección",
-                      value: projection.map { $0.timeHalfSeconds.formattedRaceTime } ?? "—")
+            QuickStat(title: "Gimnasio",
+                      value: weekTonnage > 0 ? "\(weekTonnage.formattedKg) kg" : "—")
         }
     }
 }

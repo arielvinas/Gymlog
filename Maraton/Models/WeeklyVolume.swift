@@ -41,7 +41,16 @@ enum PlannedDistance {
     }
 }
 
-/// Suma de kilómetros por semana calendario (lunes a domingo).
+/// Volumen de una semana calendario: km corridos y tonelaje levantado.
+struct WeekVolume: Identifiable {
+    let weekStart: Date
+    let runKm: Double
+    let tonnage: Double
+
+    var id: Date { weekStart }
+}
+
+/// Suma de kilómetros y tonelaje por semana calendario (lunes a domingo).
 enum WeeklyVolume {
     /// Km planificados de todos los días de la semana que contiene `date`.
     static func plannedKm(for date: Date = Date(), among days: [WorkoutDay]) -> Double {
@@ -53,6 +62,40 @@ enum WeeklyVolume {
         daysInWeek(of: date, among: days)
             .compactMap { $0.isCompleted ? $0.actualKm : nil }
             .reduce(0, +)
+    }
+
+    /// Tonelaje de gimnasio de la semana: suma de peso × repeticiones de cada
+    /// serie. Las series sin peso o sin reps (core, banda, plancha) no suman.
+    static func tonnage(for date: Date = Date(), among exercises: [Exercise]) -> Double {
+        let cal = PlanConstants.calendar
+        return exercises
+            .filter { cal.isDate($0.dayDate, equalTo: date, toGranularity: .weekOfYear) }
+            .flatMap(\.orderedSets)
+            .reduce(0) { acumulado, set in
+                guard let peso = set.weight, let reps = set.reps else { return acumulado }
+                return acumulado + peso * Double(reps)
+            }
+    }
+
+    /// Las últimas `count` semanas, de la más vieja a la más reciente (la última
+    /// es la que contiene `today`). Sirve para dibujar la tendencia de volumen.
+    static func recentWeeks(
+        _ count: Int = 6,
+        days: [WorkoutDay],
+        exercises: [Exercise],
+        today: Date = Date()
+    ) -> [WeekVolume] {
+        let cal = PlanConstants.calendar
+        return (0..<count).reversed().compactMap { offset in
+            guard let date = cal.date(byAdding: .weekOfYear, value: -offset, to: today),
+                  let start = cal.dateInterval(of: .weekOfYear, for: date)?.start
+            else { return nil }
+            return WeekVolume(
+                weekStart: start,
+                runKm: actualKm(for: date, among: days),
+                tonnage: tonnage(for: date, among: exercises)
+            )
+        }
     }
 
     private static func daysInWeek(of date: Date, among days: [WorkoutDay]) -> [WorkoutDay] {

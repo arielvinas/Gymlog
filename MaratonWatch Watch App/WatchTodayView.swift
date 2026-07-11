@@ -99,7 +99,7 @@ private struct WatchDayPage: View {
 
     private var headerText: String {
         if Calendar.current.isDateInToday(day.date) {
-            return "Hoy · Córdoba en \(PlanConstants.daysUntilRace())d"
+            return "Hoy"
         }
         return day.date.weekdayAndDay
     }

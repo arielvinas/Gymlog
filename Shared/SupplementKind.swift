@@ -51,8 +51,8 @@ enum SupplementKind: String, Codable, CaseIterable, Identifiable {
 
     var notificationBody: String {
         switch self {
-        case .creatina: return "¿Tomaste tu creatina hoy? La constancia te prepara para Córdoba."
-        case .proteina: return "Acordate de tu proteína. Sumar hábitos suma en la carrera."
+        case .creatina: return "¿Tomaste tu creatina hoy? La constancia es la que rinde."
+        case .proteina: return "Acordate de tu proteína. Sumar hábitos suma en el entrenamiento."
         }
     }
 }

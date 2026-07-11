@@ -45,7 +45,6 @@ struct ProgressReport {
     let generatedAt: Date
     let periodStart: Date
     let periodEnd: Date
-    let daysToRace: Int
 
     // Adherencia al plan
     let trainingDaysCount: Int
@@ -63,7 +62,6 @@ struct ProgressReport {
     let longestRunDate: Date?
     let avgPerceivedEffort: Double?
     let recentRuns: [ReportRunRow]
-    let projection: RaceProjection?
 
     // Fuerza
     let strengthSessions: Int
@@ -142,9 +140,6 @@ enum ProgressReportBuilder {
             )
         }
 
-        let projection = AveragePaceProjection()
-            .project(from: RaceProjectionBuilder.samples(from: periodDays), today: today)
-
         let strengthSessions = periodDays.filter { $0.type == .fuerza && $0.isCompleted }.count
         let improvements = StrengthProgress.recentImprovements(exercises: exercises)
 
@@ -165,7 +160,6 @@ enum ProgressReportBuilder {
             generatedAt: today,
             periodStart: periodStart,
             periodEnd: today,
-            daysToRace: PlanConstants.daysUntilRace(),
             trainingDaysCount: trainingDays.count,
             completedTrainingDays: completedTraining.count,
             weekStreak: StreakCalculator.currentWeekStreak(days: days, today: today),
@@ -179,7 +173,6 @@ enum ProgressReportBuilder {
             longestRunDate: longest?.date,
             avgPerceivedEffort: avgEffort,
             recentRuns: Array(recentRuns),
-            projection: projection,
             strengthSessions: strengthSessions,
             improvements: improvements,
             supplements: supplements,

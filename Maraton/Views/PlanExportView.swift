@@ -15,7 +15,7 @@ import UniformTypeIdentifiers
 
 // MARK: - Vista que se renderiza al PDF
 
-/// Diseño del plan para el PDF: encabezado de la carrera + las semanas con sus
+/// Diseño del plan para el PDF: encabezado + las semanas con sus
 /// días. Ancho flexible: en la vista previa ocupa el ancho disponible y, al
 /// renderizar el PDF, `PlanPDF` la enmarca a un ancho fijo (A4).
 struct PlanExportView: View {
@@ -55,12 +55,6 @@ struct PlanExportView: View {
             Text("Mi plan de entrenamiento")
                 .font(.largeTitle.bold())
                 .foregroundStyle(.black)
-            Text("Media Maratón de Córdoba · \(PlanConstants.raceDistanceKm.formattedKm) km")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-            Label(PlanConstants.raceDate.longDate, systemImage: "flag.checkered")
-                .font(.headline)
-                .foregroundStyle(WorkoutType.carrera.color)
             Divider()
                 .padding(.top, 4)
         }

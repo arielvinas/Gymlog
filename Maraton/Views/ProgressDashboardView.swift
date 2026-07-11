@@ -15,8 +15,6 @@ struct ProgressDashboardView: View {
 
     @State private var showingReport = false
 
-    private var daysToRace: Int { PlanConstants.daysUntilRace() }
-
     /// Suma de kilómetros reales registrados en días completados.
     private var totalKm: Double {
         days.compactMap { $0.isCompleted ? $0.actualKm : nil }.reduce(0, +)
@@ -32,20 +30,23 @@ struct ProgressDashboardView: View {
         StreakCalculator.currentWeekStreak(days: days)
     }
 
-    private var projection: RaceProjection? {
-        let runs = RaceProjectionBuilder.samples(from: days)
-        return AveragePaceProjection().project(from: runs, today: Date())
-    }
-
     private var improvements: [ExerciseImprovement] {
         StrengthProgress.recentImprovements(exercises: exercises)
     }
+
+    private var recentWeeks: [WeekVolume] {
+        WeeklyVolume.recentWeeks(days: days, exercises: exercises)
+    }
+
+    private var weekKm: Double { WeeklyVolume.actualKm(among: days) }
+    private var weekPlannedKm: Double { WeeklyVolume.plannedKm(among: days) }
+    private var weekTonnage: Double { WeeklyVolume.tonnage(among: exercises) }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    countdownCard
+                    weekVolumeCard
 
                     HStack(spacing: 16) {
                         StatCard(
@@ -66,7 +67,7 @@ struct ProgressDashboardView: View {
 
                     ConsistencyCard(weekStreak: weekStreak)
                     SupplementsProgressCard()
-                    ProjectionCard(projection: projection)
+                    VolumeTrendCard(weeks: recentWeeks)
                     StrengthEvolutionCard(improvements: improvements)
                 }
                 .padding()
@@ -88,25 +89,29 @@ struct ProgressDashboardView: View {
         }
     }
 
-    private var countdownCard: some View {
+    /// Resumen de la semana en curso: km corridos arriba, tonelaje de gimnasio
+    /// abajo. Si la semana tiene km planificados, los muestra como referencia.
+    private var weekVolumeCard: some View {
         VStack(spacing: 8) {
-            Text("Faltan para la carrera")
+            Text("Esta semana")
                 .font(.headline)
                 .foregroundStyle(.white.opacity(0.9))
 
-            Text("\(daysToRace)")
+            Text(weekKm.formattedKm)
                 .font(.system(size: 80, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
 
-            Text(daysToRace == 1 ? "día" : "días")
+            Text(weekPlannedKm > 0 ? "de \(weekPlannedKm.formattedKm) km planificados" : "km corridos")
                 .font(.title3)
                 .fontWeight(.medium)
                 .foregroundStyle(.white.opacity(0.9))
 
-            Text("Media Maratón Córdoba · \(PlanConstants.raceDistanceKm.formattedKm) km")
-                .font(.subheadline)
-                .foregroundStyle(.white.opacity(0.85))
-                .padding(.top, 4)
+            if weekTonnage > 0 {
+                Label("\(weekTonnage.formattedKg) kg levantados", systemImage: "dumbbell.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
@@ -114,7 +119,7 @@ struct ProgressDashboardView: View {
             RoundedRectangle(cornerRadius: 20)
                 .fill(
                     LinearGradient(
-                        colors: [.red, .orange],
+                        colors: [.blue, .teal],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )

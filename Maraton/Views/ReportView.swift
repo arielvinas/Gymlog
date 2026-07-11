@@ -38,17 +38,9 @@ struct ReportView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Reporte de progreso")
                 .font(.system(size: 30, weight: .heavy, design: .rounded))
-            Text("Media Maratón Córdoba · \(PlanConstants.raceDistanceKm.formattedKm) km")
-                .font(.headline)
+            Text("Período: \(report.periodStart.dayMonth) – \(report.periodEnd.dayMonth)")
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
-            HStack(spacing: 16) {
-                Text("Período: \(report.periodStart.dayMonth) – \(report.periodEnd.dayMonth)")
-                Text("Faltan \(report.daysToRace) días")
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.red)
-            }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
             Text("Generado el \(report.generatedAt.longDate)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -85,13 +77,6 @@ struct ReportView: View {
                 row("Corrida más larga", "\(km.formattedKm) km · \(date.dayMonth)")
             }
             row("Esfuerzo percibido promedio", report.avgPerceivedEffort.map { String(format: "%.1f/10", $0) } ?? "—")
-
-            if let p = report.projection {
-                Divider().padding(.vertical, 2)
-                row("Proyección 10 km", p.time10kSeconds.formattedRaceTime)
-                row("Proyección media maratón", p.timeHalfSeconds.formattedRaceTime)
-                row("Ritmo base proyectado", p.basePaceSecPerKm.formattedPace)
-            }
 
             if !report.recentRuns.isEmpty {
                 Divider().padding(.vertical, 4)
