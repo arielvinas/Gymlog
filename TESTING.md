@@ -40,6 +40,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
 | 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. | I-21 |
 | 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. | U-27, U-35 |
+| **12** | 🆕 **Reabrir un día terminado reinicia la sesión.** ✅ **CONFIRMADO y alcanzable** (I-15). `firstIncompleteIndex` hace `firstIndex { … } ?? 0`: sin series pendientes devuelve **0**, indistinguible de "la primera está pendiente". El botón "Empezar sesión guiada" **no está gateado por `isCompleted`**, así que abrir un día ya entrenado te deja en la serie 1 con el botón de completar listo — y seguir el flujo arranca un descanso de 90 s y rehace la sesión. La fase `.done` solo la pone `finish()`, o sea que **vive en memoria y no sobrevive a cerrar la sesión**. Datos no se pierden. **Pendiente de arreglar.** | I-15 ✅ |
 
 Además, dos contradicciones entre el código y sus comentarios, que hay que resolver decidiendo
 cuál gana: `applyPlanUpdates` dice "los días que el usuario borre no se vuelven a insertar" pero
@@ -357,8 +358,13 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       así que ese día pasa a tener orden indefinido. De paso, deja huecos en el orden del día
       actual (`[0, 2, 3]`). Lo contiene la UI: los dos call sites recorren `switchableExercises`.
       El `guard` que falta es `day.orderedExercises.contains { $0 === exercise }`.
-- [ ] **I-15** Retomar una sesión a medias arranca en la primera serie incompleta. ⚠️ **Si están
-      todas hechas devuelve 0** → reinicia desde el principio en vez de ir a `.done`.
+- [x] **I-15** ⚠️ **Bug 12 (nuevo) — CONFIRMADO y alcanzable.** ✅ Retomar a medias funciona bien:
+      cae en la primera serie incompleta, incluso si el hueco está en el medio (`firstIndex`, no
+      `lastIndex`). Pero **con todas las series hechas devuelve 0** y reabre la sesión en la serie
+      1, en `.logging`, sobre un día completo. Alcanzable: "Empezar sesión guiada" no mira
+      `isCompleted`. Seguir el flujo arranca un descanso de 90 s y rehace la sesión entera.
+      La raíz: `.done` solo lo pone `finish()`, así que **la fase no se deriva del estado del día**
+      y no sobrevive a cerrar la sesión. **Pendiente de arreglar.**
 - [ ] **I-16** **Día sin ejercicios:** `steps == []`, `isLastStep == true` (!), `completeCurrent` es
       no-op → **la sesión nunca llega a `.done`**.
 - [ ] **I-17** `prefillCurrentSet` aplica reps objetivo (`"6-8"` → **8**, el máximo) + peso

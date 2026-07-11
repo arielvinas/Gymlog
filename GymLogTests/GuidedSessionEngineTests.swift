@@ -1352,4 +1352,119 @@ struct GuidedSessionEngineTests {
         // El `guard` que falta sería `day.orderedExercises.contains { $0 === exercise }`.
         // Hoy lo suple la UI, que es una garantía por convención, no por tipo.
     }
+
+    // MARK: - I-15
+
+    // Retomar es el caso normal: la sesión de gimnasio se interrumpe (te llaman, se cierra
+    // la app, se queda sin batería el reloj) y al volver hay que caer en la serie donde se
+    // dejó. `firstIncompleteIndex` es quien decide dónde.
+
+    @Test("I-15 · Retomar cae en la primera serie incompleta, no en la última hecha")
+    func resumingLandsOnTheFirstIncompleteSet() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        // Se hicieron las dos primeras series del press. Queda la tercera.
+        let press = day.orderedExercises[0]
+        press.orderedSets[0].isDone = true
+        press.orderedSets[1].isDone = true
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        #expect(engine.index == 2)
+        #expect(engine.currentStep?.exercise.name == "Press banca")
+        #expect(engine.currentStep?.setNumber == 3)
+        #expect(engine.phase == .logging)
+    }
+
+    @Test("I-15 · Con un hueco en el medio, retomar vuelve al hueco")
+    func resumingGoesBackToTheGap() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        // Escenario raro pero posible (se volvió atrás y se abandonó ahí): la serie 1 y la
+        // 3 están hechas, la 2 no.
+        let press = day.orderedExercises[0]
+        press.orderedSets[0].isDone = true
+        press.orderedSets[2].isDone = true
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Es `firstIndex`, no `lastIndex`: manda al hueco. Correcto — la serie 2 es la que
+        // falta, y saltarla dejaría la sesión incompleta para siempre.
+        #expect(engine.index == 1)
+        #expect(engine.currentStep?.setNumber == 2)
+    }
+
+    @Test("I-15 · ⚠️ Con todas las series hechas, reabrir la sesión la reinicia desde cero")
+    func reopeningAFinishedSessionRestartsIt() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        // Un día ya terminado: todas las series hechas, con sus datos.
+        for ejercicio in day.orderedExercises {
+            for serie in ejercicio.orderedSets {
+                serie.weight = 60
+                serie.reps = 8
+                serie.isDone = true
+            }
+        }
+        day.isCompleted = true
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // ⚠️ `firstIncompleteIndex` hace `firstIndex { ... } ?? 0`: cuando **no encuentra**
+        // ninguna serie pendiente devuelve 0, que es indistinguible de "la primera está
+        // pendiente". Así que la sesión arranca en la serie 1, en fase de carga, sobre un
+        // día que ya está completo.
+        #expect(engine.index == 0)
+        #expect(engine.phase == .logging, "⚠️ Debería arrancar en `.done`")
+        #expect(engine.currentStep?.setNumber == 1)
+
+        // Y esto **es alcanzable**: el botón "Empezar sesión guiada" de `GymSessionView` no
+        // está condicionado por `isCompleted`. Reabrir un día terminado te pone de nuevo en
+        // la serie 1, con el botón de completar listo, como si no hubieras entrenado.
+        #expect(engine.currentStep?.set?.isDone == true, "La serie que muestra ya estaba hecha")
+
+        // Los datos no se pierden (el prellenado nunca pisa lo cargado)...
+        #expect(engine.currentStep?.set?.weight == 60)
+        #expect(engine.currentStep?.set?.reps == 8)
+
+        // ...pero si el usuario sigue el flujo que la app le propone, arranca un descanso y
+        // rehace la sesión entera. El día ya estaba completo: no hay nada que hacer acá.
+        engine.completeCurrent()
+        #expect(engine.phase == .resting, "⚠️ Descanso de 90 s sobre una serie hecha hace rato")
+    }
+
+    @Test("I-15 · La sesión completada desde adentro sí termina en done")
+    func aSessionCompletedInPlaceEndsInDone() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // El contraste que muestra dónde está el problema: recorrida de punta a punta, la
+        // sesión termina bien en `.done`. `phase = .done` lo pone `finish()`, y `finish()`
+        // solo se llama desde `completeCurrent`. Nadie lo deriva del estado del día al
+        // arrancar — por eso reabrir no lo recupera.
+        for _ in 0..<4 {
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+        engine.completeCurrent()
+
+        #expect(engine.phase == .done)
+        #expect(day.isCompleted)
+
+        // Pero un engine nuevo sobre el mismo día (o sea: cerrar y volver a entrar) ya no
+        // lo sabe. La fase `.done` vive solo en memoria.
+        let reabierto = GuidedSessionEngine()
+        reabierto.start(day: day, context: db.context)
+        #expect(reabierto.phase == .logging, "⚠️ El `.done` no sobrevive a cerrar la sesión")
+        #expect(reabierto.index == 0)
+    }
 }
