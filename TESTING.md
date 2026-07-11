@@ -308,8 +308,14 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       **Alcanzable todos los días:** bajás la muñeca, el reloj apaga la pantalla y deja de tickear.
       **Fix propuesto:** saltar `nextOvertimeAlert` al próximo múltiplo de 10 por encima del
       `restOvertime` actual, en vez de incrementarlo de a 10. **Pendiente de aplicar** (commit aparte).
-- [ ] **I-08** `adjustRest(±15)` mueve `restEndDate`, no lo deja en negativo, y **persiste
-      `exercise.restSeconds`** (ojo: cambia la preferencia del ejercicio, no solo este descanso).
+- [x] **I-08** `adjustRest(±15)` mueve `restEndDate`, no lo deja en negativo, y **persiste
+      `exercise.restSeconds`** (ojo: cambia la preferencia del ejercicio, no solo este descanso). ✅
+      Confirmado que el ajuste **queda recordado**: la serie siguiente del mismo ejercicio ya arranca
+      con el descanso nuevo. Es deliberado ("lo aprende"), pero implica que **no hay forma de alargar
+      un descanso solo por esta vez**. Decisión de producto, no bug.
+      Los dos clamps son distintos a propósito: el remanente baja a **1 s** (el descanso se corta ya)
+      pero el total recordado no baja de **15 s** (para no dejar al ejercicio con un descanso
+      inservible). Efecto colateral: el anillo de la UI queda casi vacío (`restFraction` = 1/15).
 - [ ] **I-09** `goBackFromLogging` vuelve atrás y **des-marca** la serie. En `index == 0` es no-op
       **y no emite `onStateChanged`** (el iPhone no recibe eco).
 - [ ] **I-10** `goBackFromResting` **no avanza el índice** y deja `restTotal`/`restRemaining`/

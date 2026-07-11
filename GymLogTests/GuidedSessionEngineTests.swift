@@ -571,4 +571,93 @@ struct GuidedSessionEngineTests {
             "Comportamiento actual: ráfaga de 4 vibraciones al volver. Lo correcto sería 1"
         )
     }
+
+    // MARK: - I-08
+
+    // `adjustRest` usa `Date()` internamente, así que el remanente no es exacto al
+    // segundo en un test. Lo que sí es determinístico —y lo que importa— es
+    // `restTotal` y lo que queda persistido en el ejercicio.
+
+    @Test("I-08 · Sumar 15 s alarga el descanso en curso")
+    func adjustRestAddsTime() throws {
+        let db = TestDB()
+        let (engine, _) = try engineResting(in: db)
+        #expect(engine.restTotal == 90)
+
+        engine.adjustRest(by: 15)
+
+        #expect(engine.restTotal == 105)
+        #expect((104...105).contains(engine.restRemaining))
+
+        let nuevoFin = try #require(engine.restEndDate)
+        #expect(nuevoFin.timeIntervalSinceNow > 100, "El fin del descanso se corrió hacia adelante")
+    }
+
+    @Test("I-08 · Ajustar el descanso queda recordado en el ejercicio")
+    func adjustRestPersistsThePreference() throws {
+        let db = TestDB()
+        let (engine, _) = try engineResting(in: db)
+        let press = try #require(engine.currentStep?.exercise)
+
+        engine.adjustRest(by: 15)
+
+        // No es solo para este descanso: el ejercicio se lleva la preferencia, así que
+        // la próxima serie del press ya arranca con 105 s. Es deliberado ("lo aprende"),
+        // pero conviene saberlo: no hay forma de alargar un descanso "solo por esta vez".
+        #expect(press.restSeconds == 105)
+
+        engine.skipRest()
+        engine.completeCurrent()
+        #expect(engine.restTotal == 105, "La serie siguiente ya usa el descanso ajustado")
+    }
+
+    @Test("I-08 · Restar más de lo que queda no deja el descanso en negativo")
+    func adjustRestNeverGoesNegative() throws {
+        let db = TestDB()
+        let (engine, _) = try engineResting(in: db)
+
+        engine.adjustRest(by: -120)   // más de los 90 s que había
+
+        // Dos clamps distintos, a propósito: el remanente baja a 1 s (el descanso se
+        // corta ya) pero el total recordado no baja de 15 (para no dejar al ejercicio
+        // con un descanso inservible).
+        #expect(engine.restRemaining == 1)
+        #expect(engine.restTotal == 15)
+        #expect(engine.phase == .resting)
+
+        // Efecto colateral de tener dos pisos: el anillo de la UI queda casi vacío.
+        #expect(abs(engine.restFraction - 1.0 / 15.0) < 0.001)
+    }
+
+    @Test("I-08 · Ajustar el descanso reinicia el tiempo extra")
+    func adjustRestResetsOvertime() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        engine.tickRest(now: fin.addingTimeInterval(20))
+        #expect(engine.isRestOvertime)
+
+        // "+15" desde el tiempo extra es lo que hacés cuando querés estirar un toque más.
+        engine.adjustRest(by: 15)
+
+        #expect(engine.restOvertime == 0)
+        #expect(!engine.isRestOvertime)
+        #expect(engine.restRemaining >= 1)
+    }
+
+    @Test("I-08 · Fuera del descanso, adjustRest no hace nada")
+    func adjustRestIsANoOpOutsideResting() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        #expect(engine.phase == .logging)
+
+        let press = day.orderedExercises[0]
+        engine.adjustRest(by: 15)
+
+        #expect(engine.restTotal == 0, "Sin descanso en curso no hay nada que ajustar")
+        #expect(press.restSeconds == 90, "Y no debería tocar la preferencia del ejercicio")
+    }
 }
