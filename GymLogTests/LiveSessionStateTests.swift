@@ -194,4 +194,49 @@ struct LiveSessionStateTests {
         #expect(LiveSessionWire.snapshot(from: commandPayload) == nil)
         #expect(LiveSessionWire.command(from: snapshotPayload) == nil)
     }
+
+    // MARK: - U-16
+
+    // ⚠️ Estos tests **documentan un fallo silencioso**, no lo aprueban.
+    //
+    // `LiveSessionWire.snapshot(from:)` y `command(from:)` decodifican con `try?`:
+    // ante un payload que no entienden devuelven `nil` y siguen, sin log y sin
+    // avisarle a nadie. En la práctica eso significa que si el reloj y el iPhone
+    // quedan en versiones distintas del schema, **la sesión en vivo simplemente no
+    // aparece** y no hay ninguna pista de por qué.
+    //
+    // Los tests fijan el comportamiento actual (devolver `nil` en vez de crashear,
+    // que está bien) para que quede escrito. Si algún día se agrega logging o una
+    // versión al payload, estos tests son el lugar donde se nota.
+
+    @Test("U-16 · Un diccionario sin la clave esperada devuelve nil")
+    func missingKeyReturnsNil() {
+        #expect(LiveSessionWire.snapshot(from: [:]) == nil)
+        #expect(LiveSessionWire.command(from: [:]) == nil)
+        #expect(LiveSessionWire.snapshot(from: ["otraCosa": Data()]) == nil)
+    }
+
+    @Test("U-16 · La clave correcta con un valor que no es Data devuelve nil")
+    func wrongValueTypeReturnsNil() {
+        #expect(LiveSessionWire.snapshot(from: [LiveSessionWire.snapshotKey: "no soy Data"]) == nil)
+        #expect(LiveSessionWire.command(from: [LiveSessionWire.commandKey: 42]) == nil)
+    }
+
+    @Test("U-16 · Data corrupta se descarta en silencio")
+    func corruptDataIsSilentlyDiscarded() {
+        let basura = Data([0x00, 0x01, 0x02, 0xFF])
+        #expect(LiveSessionWire.snapshot(from: [LiveSessionWire.snapshotKey: basura]) == nil)
+        #expect(LiveSessionWire.command(from: [LiveSessionWire.commandKey: basura]) == nil)
+    }
+
+    @Test("U-16 · Un snapshot de otra versión del schema se descarta entero")
+    func snapshotFromAnotherSchemaVersionIsDiscarded() throws {
+        // JSON válido, pero al que le falta un campo requerido: es exactamente lo
+        // que llegaría de un reloj con una versión vieja de la app. Hoy se pierde
+        // el snapshot completo, en silencio.
+        let jsonViejo = #"{"sessionID":"3F2504E0-4F89-11D3-9A0C-0305E82C3301","phase":"logging"}"#
+        let data = try #require(jsonViejo.data(using: .utf8))
+
+        #expect(LiveSessionWire.snapshot(from: [LiveSessionWire.snapshotKey: data]) == nil)
+    }
 }

@@ -165,9 +165,13 @@ ninguna red.
       más frágil ante un rename. Y cada `case` restante. ✅
 - [x] **U-15** `LiveSessionWire.payload(for:)` → `snapshot(from:)` devuelve un snapshot igual. ✅
       (También el comando, y que cada decodificador solo entienda su propia clave.)
-- [ ] **U-16** `snapshot(from:)` con `Data` corrupta o sin la clave → `nil`. **Documenta un fallo
+- [x] **U-16** `snapshot(from:)` con `Data` corrupta o sin la clave → `nil`. **Documenta un fallo
       silencioso**: hoy usa `try?`, así que un payload de otra versión del schema se descarta sin
-      log.
+      log. ✅ **Confirmado.** Un JSON válido al que le falte un campo requerido —exactamente lo que
+      mandaría un reloj con una versión vieja de la app— hace que **se pierda el snapshot entero,
+      sin ninguna pista**. La sesión en vivo simplemente no aparece. El comportamiento actual
+      (devolver `nil` en vez de crashear) está bien; lo que falta es **logging** o una **versión en
+      el payload**. Pendiente de decidir: no es un bug de corrección, es de diagnosticabilidad.
 - [ ] **U-17** Fidelidad de las `Date` en el round-trip. Blinda contra que alguien cambie la
       estrategia de encoding de un solo lado — el encoder y el decoder son dos instancias distintas.
 
