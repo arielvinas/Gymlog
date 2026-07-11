@@ -268,8 +268,10 @@ externos ya están inyectados como closures (`onRestAlert`, `onStateChanged`, `o
 `onRestEnded`) → **se espían con contadores, sin mocks**. `tickRest(now:)` recibe la fecha, así que
 el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
 
-- [ ] **I-01** `start(day:)` arma los pasos (ejercicios × series) y arranca en `.logging` sobre la
-      primera serie incompleta.
+- [x] **I-01** `start(day:)` arma los pasos (ejercicios × series) y arranca en `.logging` sobre la
+      primera serie incompleta. ✅ También: el core (sin series) ocupa un paso, y `start` es
+      idempotente — la vista llama `prepare` en el init y `start` en el `onAppear`, así que rearmar
+      los pasos perdería el progreso de la sesión en curso.
 - [ ] **I-02** `completeCurrent` → `.resting` con el descanso del ejercicio. En la última serie →
       `.done`.
 - [ ] **I-03** Un paso **sin series** (core) → `completeCurrent` **saltea el descanso** y avanza
