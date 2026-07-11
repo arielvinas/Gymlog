@@ -1682,4 +1682,149 @@ struct GuidedSessionEngineTests {
         #expect(serieDelRemo.weight == nil)
         #expect(serieDelRemo.reps == 10, "Las reps sí: salen del objetivo del remo")
     }
+
+    // MARK: - I-18
+
+    // De dónde sale el peso sugerido. Hay dos fuentes y **el orden importa**: primero la
+    // serie previa **de esta sesión** (lo que estás levantando hoy), y recién si no hay,
+    // el historial (lo que levantaste la última vez que hiciste el ejercicio).
+    //
+    // Está bien así: si hoy subiste de 70 a 80, la serie que viene tiene que arrancar en 80.
+    // El historial sabe menos que la sesión en curso.
+
+    /// Deja registrado en la base que este ejercicio ya se hizo en una fecha anterior, con
+    /// los pesos dados. Es el "historial" que mira `ExerciseHistory.lastWeight`.
+    @MainActor
+    private func historial(
+        _ nombre: String, on fecha: Date, weights: [Double?], in context: ModelContext
+    ) {
+        let dia = makeDay(fecha, type: .fuerza, title: "Fuerza A", in: context)
+        makeExercise(nombre, on: dia, order: 0,
+                     sets: weights.map { (weight: $0, reps: 8) }, in: context)
+    }
+
+    @Test("I-18 · La serie previa de esta sesión le gana al historial")
+    func thisSessionBeatsTheHistory() throws {
+        let db = TestDB()
+        // La última vez el press se hizo con 70 kg.
+        historial("Press banca", on: date(2026, 6, 24), weights: [70], in: db.context)
+
+        let hoy = dayWithTwoExercises(in: db.context)
+        let engine = GuidedSessionEngine()
+        engine.start(day: hoy, context: db.context)
+
+        // La serie 1 llega con los 70 kg del historial: es lo mejor que se sabe al arrancar.
+        #expect(engine.currentStep?.set?.weight == 70)
+
+        // Pero hoy el usuario se siente bien y sube a 80.
+        engine.currentStep?.set?.weight = 80
+        engine.completeCurrent()
+        engine.skipRest()
+
+        // La serie 2 tiene que arrancar en 80, no volver a 70. Si el historial le ganara a
+        // la sesión en curso, cada serie te haría bajar el peso que acabás de subir.
+        #expect(try #require(engine.currentStep?.set).weight == 80)
+    }
+
+    @Test("I-18 · Sin nada cargado hoy, el peso sale del historial")
+    func theHistoryIsUsedWhenTodayIsEmpty() throws {
+        let db = TestDB()
+        historial("Press banca", on: date(2026, 6, 24), weights: [72.5], in: db.context)
+
+        let hoy = dayWithTwoExercises(in: db.context)
+        let engine = GuidedSessionEngine()
+        engine.start(day: hoy, context: db.context)
+
+        #expect(try #require(engine.currentStep?.set).weight == 72.5)
+    }
+
+    @Test("I-18 · El historial mira hacia atrás, nunca hacia adelante")
+    func theHistoryOnlyLooksBackwards() throws {
+        let db = TestDB()
+        let hoy = dayWithTwoExercises(in: db.context)
+
+        // Una sesión **futura** ya sembrada por el plan (los días vienen creados de
+        // antemano). Si `lastWeight` no filtrara por fecha, un peso cargado ahí —o un día
+        // futuro con datos de prueba— se colaría como sugerencia de hoy.
+        historial("Press banca", on: date(2026, 7, 8), weights: [100], in: db.context)
+        // Y una pasada, que es la que corresponde.
+        historial("Press banca", on: date(2026, 6, 24), weights: [70], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: hoy, context: db.context)
+
+        #expect(try #require(engine.currentStep?.set).weight == 70, "El futuro no cuenta")
+    }
+
+    @Test("I-18 · Del historial toma el peso más alto de esa sesión, no el último")
+    func theHistoryTakesTheMaxOfTheSession() throws {
+        let db = TestDB()
+        // Una sesión en pirámide: subió a 80 y bajó a 65 en la última serie (fatiga).
+        historial("Press banca", on: date(2026, 6, 24), weights: [70, 80, 65], in: db.context)
+
+        let hoy = dayWithTwoExercises(in: db.context)
+        let engine = GuidedSessionEngine()
+        engine.start(day: hoy, context: db.context)
+
+        // Sugiere 80, no 65. Es una decisión de producto, no un descuido: el máximo es tu
+        // tope real en ese ejercicio; el último peso puede ser una serie de descarga. Vale
+        // dejarlo escrito porque el efecto es que la sugerencia **no baja** cuando aflojás
+        // el final de la sesión.
+        #expect(try #require(engine.currentStep?.set).weight == 80)
+    }
+
+    @Test("I-18 · Saltea las sesiones donde no se anotó peso")
+    func sessionsWithoutWeightAreSkipped() throws {
+        let db = TestDB()
+        // La sesión más reciente existe pero quedó sin pesos (se tildaron las series y
+        // listo). La anterior sí tiene.
+        historial("Press banca", on: date(2026, 6, 24), weights: [nil, nil], in: db.context)
+        historial("Press banca", on: date(2026, 6, 17), weights: [65], in: db.context)
+
+        let hoy = dayWithTwoExercises(in: db.context)
+        let engine = GuidedSessionEngine()
+        engine.start(day: hoy, context: db.context)
+
+        // Sigue buscando hacia atrás en vez de rendirse en la primera sesión sin datos.
+        #expect(try #require(engine.currentStep?.set).weight == 65)
+    }
+
+    @Test("I-18 · ⚠️ Solo mira 10 sesiones para atrás")
+    func theHistoryOnlyLooksBackTenSessions() throws {
+        let db = TestDB()
+
+        // 10 sesiones seguidas sin peso anotado...
+        for semana in 0..<10 {
+            historial("Press banca", on: date(2026, 6, 24).addingTimeInterval(-Double(semana) * 86_400),
+                      weights: [nil], in: db.context)
+        }
+        // ...y la 11ª, la única con un peso.
+        historial("Press banca", on: date(2026, 6, 1), weights: [65], in: db.context)
+
+        let hoy = dayWithTwoExercises(in: db.context)
+        let engine = GuidedSessionEngine()
+        engine.start(day: hoy, context: db.context)
+
+        // ⚠️ `lastWeight` tiene `fetchLimit = 10`: si las 10 sesiones más recientes del
+        // ejercicio no tienen peso, no mira más atrás y devuelve `nil`. En la práctica no
+        // molesta (nadie hace 10 sesiones seguidas sin anotar el peso), pero es un límite
+        // real y silencioso: la sugerencia desaparece sin explicación.
+        #expect(engine.currentStep?.set?.weight == nil, "El peso de la 11ª sesión no se alcanza")
+    }
+
+    @Test("I-18 · Si la serie ya tiene peso, no se sugiere nada")
+    func noSuggestionWhenTheSetAlreadyHasWeight() throws {
+        let db = TestDB()
+        historial("Press banca", on: date(2026, 6, 24), weights: [70], in: db.context)
+
+        let hoy = dayWithTwoExercises(in: db.context)
+        let engine = GuidedSessionEngine()
+        engine.start(day: hoy, context: db.context)
+        let paso = try #require(engine.currentStep)
+
+        // `suggestedWeight` sale por `guard set.weight == nil`. Es la otra mitad de la regla
+        // de I-17 ("nunca pisa lo cargado"), y es lo que la UI usa para decidir si muestra
+        // la sugerencia como un valor tentativo.
+        #expect(engine.suggestedWeight(for: paso) == nil, "Ya tiene los 70 del prellenado")
+    }
 }

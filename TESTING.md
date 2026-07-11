@@ -388,8 +388,15 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       Corre también en `advance()`, no solo al arrancar: por eso la serie siguiente llega con el
       **último** peso cargado y la sesión es un tap por serie. El peso **no cruza de un ejercicio
       a otro** — un número plausible y equivocado sería peor que no prellenar.
-- [ ] **I-18** `suggestedWeight` prefiere el peso de la serie previa **de esta sesión** por sobre el
-      histórico, y salta series intermedias sin peso.
+- [x] **I-18** `suggestedWeight` prefiere el peso de la serie previa **de esta sesión** por sobre el
+      historial. ✅ Correcto: si hoy subiste de 70 a 80, la serie que viene arranca en 80 — con la
+      preferencia al revés, cada serie te haría bajar el peso que acabás de subir.
+      El historial mira solo hacia atrás (`dayDate < currentDate`) y saltea las sesiones sin peso.
+      Dos cosas para tener presentes, ninguna es bug: del historial toma el **máximo** de esa
+      sesión, no el último peso (decisión de producto: el máximo es tu tope, el último puede ser
+      una descarga — efecto: la sugerencia **no baja** si aflojás el final); y `fetchLimit = 10`
+      hace que si las **10** sesiones más recientes del ejercicio no tienen peso, la sugerencia
+      desaparezca **sin explicación**.
 - [ ] **I-19** `apply(_ command:)` produce **la misma transición** que el método directo, para cada
       `LiveSessionCommand`. Ignora comandos con otro `sessionID`. ⚠️ `apply(.goBack)` desde `.done`
       **resucita** la sesión a `.logging`.
