@@ -170,6 +170,11 @@ re-anclan a algo que no sea una fecha fija.
 Requiere el **platform de watchOS** instalado (`xcodebuild -downloadPlatform watchOS`).
 Como el target iOS **embebe** el reloj, sin el platform **tampoco compila el iPhone**.
 
+> **Los identificadores están como placeholders** (`<UDID-IPHONE>`, `<TU-APPLE-ID>`, …)
+> porque el repo es público y son datos personales. Para conseguir los tuyos:
+> `xcrun devicectl list devices` lista los dispositivos emparejados con su UDID de
+> hardware y su id de CoreDevice (el que toma `devicectl` y `-destination 'id=…'`).
+
 - **iPhone físico:** "iPhone de Ariel", iPhone 15 Pro, UDID hardware
   `<UDID-IPHONE>` (id CoreDevice `<COREDEVICE-ID-IPHONE>`, el
   que toma `devicectl` / `-destination 'id=…'`).
