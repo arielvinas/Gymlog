@@ -283,9 +283,12 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
 - [x] **I-04** `skipRest` → `.logging` de la serie siguiente. ✅ Avanzar limpia el `restEndDate` (si
       sobreviviera, el iPhone seguiría dibujando una cuenta regresiva sobre una serie que ya no
       descansa), y `skipRest` es también la salida del tiempo extra ("Empezar serie").
-- [ ] **I-05** **Regla clave:** cuando el descanso llega a cero, el engine **no avanza solo** —
+- [x] **I-05** **Regla clave:** cuando el descanso llega a cero, el engine **no avanza solo** —
       entra en tiempo extra y espera confirmación. Es la decisión de diseño más importante del
-      engine y hoy solo la sostiene un comentario.
+      engine y hoy solo la sostiene un comentario. ✅ **Ya no.** 120 ticks seguidos pasado el
+      vencimiento no mueven la sesión ni un paso; solo `skipRest` avanza. Si avanzara solo, el reloj
+      daría por empezada una serie que el usuario todavía no arrancó, y las reps y el peso quedarían
+      asignados al momento equivocado.
 - [ ] **I-06** ⚠️ **Bug 3.** Con `restSeconds == 0`, `onStateChanged` **nunca se emite** al entrar
       en tiempo extra → el iPhone no se entera.
 - [ ] **I-07** ⚠️ **Bug 4.** Ráfaga de alertas: volver de background con `restOvertime = 35` dispara

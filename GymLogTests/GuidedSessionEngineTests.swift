@@ -359,4 +359,91 @@ struct GuidedSessionEngineTests {
         #expect(engine.index == 1)
         #expect(engine.restOvertime == 0)
     }
+
+    // MARK: - I-05
+
+    // ⭐ **La regla más importante del engine.**
+    //
+    // Cuando el descanso llega a cero, el engine **no avanza solo**: entra en tiempo
+    // extra, cuenta hacia arriba y espera a que el usuario confirme la próxima serie.
+    //
+    // Es una decisión de diseño deliberada, no un descuido. Si avanzara solo, el
+    // reloj daría por empezada una serie que el usuario todavía no arrancó —y las
+    // reps y el peso quedarían asignados al momento equivocado. Hasta ahora esa
+    // decisión solo la sostenía un comentario en el código.
+
+    /// Lleva el engine hasta el descanso de la primera serie y devuelve la fecha de
+    /// fin, para poder simular el paso del tiempo a partir de ahí.
+    @MainActor
+    private func engineResting(in db: TestDB) throws -> (GuidedSessionEngine, Date) {
+        let day = dayWithTwoExercises(in: db.context)
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.completeCurrent()
+        return (engine, try #require(engine.restEndDate))
+    }
+
+    @Test("I-05 · Al llegar a cero, el descanso NO avanza solo")
+    func restDoesNotAutoAdvanceAtZero() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        engine.tickRest(now: fin)
+
+        #expect(engine.phase == .resting, "El engine avanzó solo: se rompió la regla central")
+        #expect(engine.index == 0, "La serie siguiente no debe empezar sin confirmación")
+        #expect(engine.restRemaining == 0)
+        #expect(engine.isRestOvertime)
+    }
+
+    @Test("I-05 · El tiempo extra cuenta hacia arriba y sigue esperando")
+    func overtimeCountsUpAndKeepsWaiting() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        engine.tickRest(now: fin.addingTimeInterval(10))
+        #expect(engine.restOvertime == 10)
+
+        engine.tickRest(now: fin.addingTimeInterval(45))
+        #expect(engine.restOvertime == 45)
+
+        // Aunque pasen cinco minutos, la sesión sigue esperando en el mismo lugar.
+        engine.tickRest(now: fin.addingTimeInterval(300))
+        #expect(engine.restOvertime == 300)
+        #expect(engine.phase == .resting)
+        #expect(engine.index == 0)
+    }
+
+    @Test("I-05 · Solo la confirmación del usuario saca del tiempo extra")
+    func onlyUserConfirmationLeavesOvertime() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        // Muchos ticks: ni uno solo avanza la sesión.
+        for segundos in stride(from: 1, through: 120, by: 1) {
+            engine.tickRest(now: fin.addingTimeInterval(TimeInterval(segundos)))
+        }
+        #expect(engine.index == 0)
+        #expect(engine.phase == .resting)
+
+        engine.skipRest()
+
+        #expect(engine.index == 1, "Recién la confirmación explícita avanza")
+        #expect(engine.phase == .logging)
+    }
+
+    @Test("I-05 · Mientras queda descanso, la cuenta baja y no hay tiempo extra")
+    func restCountsDownBeforeReachingZero() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        engine.tickRest(now: fin.addingTimeInterval(-60))
+        #expect(engine.restRemaining == 60)
+        #expect(engine.restOvertime == 0)
+        #expect(!engine.isRestOvertime)
+
+        engine.tickRest(now: fin.addingTimeInterval(-1))
+        #expect(engine.restRemaining == 1)
+        #expect(!engine.isRestOvertime)
+    }
 }
