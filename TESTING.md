@@ -366,8 +366,16 @@ ninguna red.
       siempre tiene futuro.
       La unidad es la **semana** y no el día justamente porque el plan tiene descansos: contar días
       obligaría a decidir si un descanso corta la racha, y cualquier respuesta sería arbitraria.
-- [ ] **U-31** Una semana en curso sin completar **no corta** la racha (se cuenta desde la última
-      semana activa hacia atrás).
+- [x] **U-31** Una semana en curso sin completar **no corta** la racha: se cuenta hacia atrás desde
+      la **última semana con actividad**, no desde hoy. ✅ Decisión de producto, y correcta — si no,
+      el lunes a la mañana la app te diría que perdiste una racha de cinco semanas por no haber
+      entrenado *todavía*, y una racha que se pierde por no haber hecho nada aún no motiva: hace
+      que dejes de abrir la app.
+      La contracara, escrita en el test: la semana en curso **nunca** corta, ni el jueves. La racha
+      solo cae cuando esa semana **cierra** sin actividad. Es indulgente por diseño (te da la
+      semana entera para salvarla); el precio es que el número no distingue "vengo entrenando" de
+      "entrené la semana pasada y esta todavía no hice nada".
+      La indulgencia cubre **solo** la semana actual: dos semanas en blanco sí cortan.
 - [ ] **U-32** ⚠️ **Bug 2.** Agrupa por `weekTitle` (String), no por semana calendario. Test con
       dos semanas del mismo título.
 - [ ] **U-33** `currentDayStreak`: los días de descanso intercalados no cortan ni suman; hoy

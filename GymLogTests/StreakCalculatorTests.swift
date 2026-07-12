@@ -108,4 +108,83 @@ struct StreakCalculatorTests {
         // Parado en el miércoles 17, la semana que viene ni existe para el cálculo.
         #expect(StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 17)) == 1)
     }
+
+    // MARK: - U-31
+
+    // La decisión más delicada del cálculo, y es de producto: **la semana en curso, todavía sin
+    // entrenar, no corta la racha**. La racha se cuenta hacia atrás desde la **última semana con
+    // actividad**, no desde hoy.
+    //
+    // Si no fuera así, el lunes a la mañana la app te diría que perdiste una racha de cinco
+    // semanas por no haber entrenado todavía. Y una racha que se pierde por no haber hecho nada
+    // aún no motiva: hace que dejes de abrir la app.
+
+    @Test("U-31 · El lunes a la mañana la racha sigue intacta")
+    func theStreakSurvivesMondayMorning() throws {
+        let db = TestDB()
+
+        semana("Semana 1", empezando: date(2026, 6, 1), completada: true, in: db.context)
+        semana("Semana 2", empezando: date(2026, 6, 8), completada: true, in: db.context)
+        // La semana en curso: los días existen (el plan los sembró) pero no entrenó todavía.
+        semana("Semana 3", empezando: date(2026, 6, 15), completada: false, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Parado el lunes 15, recién arrancada la semana: la racha de 2 se mantiene. El
+        // `lastIndex(where: { $0.completed })` cae en la Semana 2 y cuenta desde ahí.
+        #expect(StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 15)) == 2)
+    }
+
+    @Test("U-31 · Y sigue intacta el jueves, aunque la semana siga en blanco")
+    func theStreakSurvivesMidweek() throws {
+        let db = TestDB()
+
+        semana("Semana 1", empezando: date(2026, 6, 8), completada: true, in: db.context)
+        semana("Semana 2", empezando: date(2026, 6, 15), completada: false, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // ⚠️ Acá está la contracara, y conviene tenerla escrita: la semana en curso **nunca**
+        // corta, no importa cuán avanzada esté. El jueves sin entrenar, la racha sigue en 1.
+        #expect(StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 18)) == 1)
+
+        // O sea que la racha solo "se pierde" cuando la semana **termina** sin actividad y
+        // arranca la siguiente. Es indulgente por diseño: te da la semana entera para
+        // salvarla. El precio es que el número no distingue "vengo entrenando" de "entrené la
+        // semana pasada y esta no hice nada todavía".
+    }
+
+    @Test("U-31 · Entrenar en la semana en curso la suma a la racha")
+    func trainingThisWeekExtendsTheStreak() throws {
+        let db = TestDB()
+
+        semana("Semana 1", empezando: date(2026, 6, 8), completada: true, in: db.context)
+        semana("Semana 2", empezando: date(2026, 6, 15), completada: false, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+        #expect(StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 17)) == 1)
+
+        // Entrena el miércoles: la semana en curso pasa a estar activa y se suma.
+        let miercoles = try #require(dias.first { $0.date == date(2026, 6, 17) })
+        miercoles.isCompleted = true
+
+        #expect(StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 17)) == 2)
+    }
+
+    @Test("U-31 · Dos semanas en blanco sí cortan")
+    func twoBlankWeeksDoBreakIt() throws {
+        let db = TestDB()
+
+        semana("Semana 1", empezando: date(2026, 6, 1), completada: true, in: db.context)
+        // Faltó una semana entera…
+        semana("Semana 2", empezando: date(2026, 6, 8), completada: false, in: db.context)
+        // …y la actual también va en blanco.
+        semana("Semana 3", empezando: date(2026, 6, 15), completada: false, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // La indulgencia de U-31 cubre **solo** la semana en curso. La Semana 2 ya cerró sin
+        // actividad, así que la racha cuenta desde la Semana 1 y se queda en 1 — no en 3.
+        #expect(StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 17)) == 1)
+    }
 }
