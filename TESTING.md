@@ -377,8 +377,17 @@ ninguna red.
       medidos, y el fix está escrito en el último test: cambiar la clave del `Dictionary(grouping:)`
       de `$0.weekTitle` al **inicio de la semana calendario** — que es lo que el resto de la app ya
       hace (U-28, U-29).
-- [ ] **U-33** `currentDayStreak`: los días de descanso intercalados no cortan ni suman; hoy
-      pendiente no corta; ayer pendiente sí.
+- [x] **U-33** `currentDayStreak`: los días de descanso intercalados **no cortan ni suman** (se
+      saltean con un `continue`); **hoy pendiente no corta** (misma lógica de producto que U-31);
+      **ayer pendiente sí**. ✅
+      Esas reglas son las que hacen que el número signifique **"entrenamientos que no me saltée"**
+      y no "días seguidos yendo al gimnasio" — que con un plan que tiene descansos sería siempre
+      0 o 1.
+      El `filter { date <= hoy }` **es lo que hace que el número exista**: sin él, el recorrido
+      arrancaría por los días futuros ya sembrados (sin hacer) y la racha daría 0 siempre.
+      Puros descansos → 0, no una racha infinita de "días sin faltar".
+      ⚠️ Hoy **no se muestra en ninguna pantalla** ("disponible para futuros badges"): estos tests
+      fijan el contrato **antes** de que algo dependa de él.
 
 ### Fuerza e historial
 

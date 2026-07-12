@@ -284,4 +284,111 @@ struct StreakCalculatorTests {
         // de la semana. `weekTitle` es texto para mostrar, no una identidad — y el resto de la
         // app ya usa el calendario para lo mismo (U-28, U-29).
     }
+
+    // MARK: - U-33
+
+    // `currentDayStreak` es la otra racha: **días consecutivos sin saltearse un entrenamiento**.
+    // Camina hacia atrás desde hoy y para en el primer día que debía entrenarse y no se hizo.
+    //
+    // Sus dos reglas raras son las que la hacen usable con un plan que tiene descansos:
+    // el descanso **no cuenta ni corta** (se saltea), y **hoy sin hacer todavía no corta**
+    // (igual que la semana en curso de U-31).
+    //
+    // Hoy no se muestra en ninguna pantalla —el comentario dice "disponible para futuros
+    // badges"— así que estos tests fijan el contrato **antes** de que algo dependa de él.
+
+    @Test("U-33 · Días consecutivos completados suman")
+    func consecutiveCompletedDaysCount() throws {
+        let db = TestDB()
+
+        makeDay(date(2026, 6, 15), type: .fuerza, isCompleted: true, in: db.context)
+        makeDay(date(2026, 6, 16), type: .rodaje, isCompleted: true, in: db.context)
+        makeDay(date(2026, 6, 17), type: .fuerza, isCompleted: true, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+        #expect(StreakCalculator.currentDayStreak(days: dias, today: date(2026, 6, 17)) == 3)
+    }
+
+    @Test("U-33 · El descanso no cuenta ni corta: se saltea")
+    func restDaysAreSkipped() throws {
+        let db = TestDB()
+
+        // Entrenó lunes y miércoles, con descanso el martes. El descanso no está "hecho" —
+        // nadie completa un descanso— pero tampoco debería romper la racha.
+        makeDay(date(2026, 6, 15), type: .fuerza, isCompleted: true, in: db.context)
+        makeDay(date(2026, 6, 16), type: .descanso, title: "Descanso",
+                isCompleted: false, in: db.context)
+        makeDay(date(2026, 6, 17), type: .fuerza, isCompleted: true, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // La racha es **2**, no 3: el descanso se saltea con el `continue`, así que ni suma ni
+        // corta. Es la regla que hace que el número signifique "entrenamientos que no me
+        // saltée", y no "días seguidos yendo al gimnasio".
+        #expect(StreakCalculator.currentDayStreak(days: dias, today: date(2026, 6, 17)) == 2)
+    }
+
+    @Test("U-33 · Hoy todavía pendiente no corta la racha")
+    func todayStillPendingDoesNotBreakIt() throws {
+        let db = TestDB()
+
+        makeDay(date(2026, 6, 15), type: .fuerza, isCompleted: true, in: db.context)
+        makeDay(date(2026, 6, 16), type: .rodaje, isCompleted: true, in: db.context)
+        // Hoy: el entrenamiento está cargado pero todavía no lo hizo. Son las 9 de la mañana.
+        makeDay(date(2026, 6, 17), type: .fuerza, isCompleted: false, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Sigue en 2. Misma lógica de producto que U-31: la app no te castiga por no haber
+        // entrenado *todavía*. Hoy no suma, pero tampoco rompe.
+        #expect(StreakCalculator.currentDayStreak(days: dias, today: date(2026, 6, 17)) == 2)
+    }
+
+    @Test("U-33 · Un entrenamiento salteado sí corta")
+    func amissedWorkoutBreaksTheStreak() throws {
+        let db = TestDB()
+
+        makeDay(date(2026, 6, 15), type: .fuerza, isCompleted: true, in: db.context)
+        // El martes tenía rodaje y no lo hizo. **Ayer**, no hoy: ya no hay excusa.
+        makeDay(date(2026, 6, 16), type: .rodaje, isCompleted: false, in: db.context)
+        makeDay(date(2026, 6, 17), type: .fuerza, isCompleted: true, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // La racha es 1: cuenta el miércoles y se corta en el martes salteado. El `break`
+        // detiene el recorrido — lo anterior al hueco no se cuenta, aunque estuviera hecho.
+        #expect(StreakCalculator.currentDayStreak(days: dias, today: date(2026, 6, 17)) == 1)
+    }
+
+    @Test("U-33 · Los días futuros del plan no cuentan")
+    func futureDaysAreIgnored() throws {
+        let db = TestDB()
+
+        makeDay(date(2026, 6, 17), type: .fuerza, isCompleted: true, in: db.context)
+        // El plan ya sembró mañana y pasado, sin hacer (obvio: todavía no llegaron).
+        makeDay(date(2026, 6, 18), type: .rodaje, isCompleted: false, in: db.context)
+        makeDay(date(2026, 6, 19), type: .fuerza, isCompleted: false, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Sin el `filter { $0.date <= todayStart }`, el recorrido arrancaría por el viernes
+        // sin hacer y la racha daría **0** siempre. El filtro es lo que hace que el número
+        // exista.
+        #expect(StreakCalculator.currentDayStreak(days: dias, today: date(2026, 6, 17)) == 1)
+    }
+
+    @Test("U-33 · Una racha de puros descansos es cero")
+    func onlyRestDaysGiveZero() throws {
+        let db = TestDB()
+
+        makeDay(date(2026, 6, 16), type: .descanso, title: "Descanso", in: db.context)
+        makeDay(date(2026, 6, 17), type: .descanso, title: "Descanso", in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Los descansos se saltean todos y no queda nada que contar. Cero, no una racha
+        // infinita de "días sin faltar". Correcto: no entrenaste.
+        #expect(StreakCalculator.currentDayStreak(days: dias, today: date(2026, 6, 17)) == 0)
+        #expect(StreakCalculator.currentDayStreak(days: [], today: date(2026, 6, 17)) == 0)
+    }
 }
