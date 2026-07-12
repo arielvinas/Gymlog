@@ -769,8 +769,16 @@ app inusable.
       ⚠️ Las `List` de SwiftUI son **perezosas**: una fila que no se dibujó **no está en el árbol de
       accesibilidad**, y `waitForExistence` no la encuentra nunca por más que espere. Hay que
       scrollear (`scrollHasta`), no esperar.
-- [ ] **E2E-04** Completar una sesión entera → el día queda marcado como completado.
-- [ ] **E2E-05** Cambiar el próximo ejercicio a mitad de sesión.
+- [x] **E2E-04** Completar una sesión entera → aparece "¡Sesión completa!" con el resumen, y al
+      volver **el día muestra la insignia "Completado"**. El test machaca el par (cargar → descansar)
+      con un **tope de 200 vueltas**: si la máquina de estados quedara en loop, falla con un mensaje
+      claro en vez de colgarse hasta el timeout del runner. Es el E2E más lento (~62 s: la rutina
+      del 16/6 tiene 12 ejercicios).
+- [x] **E2E-05** Cambiar el próximo ejercicio a mitad de sesión: se abre la hoja, se elige uno de
+      los pendientes, **la serie en curso no se interrumpe**, y al terminar el ejercicio actual el
+      elegido **es el que sigue**.
+      *Cambio de producción:* el botón de la barra era un **ícono mudo** (`arrow.triangle.swap` sin
+      etiqueta) — invisible para VoiceOver *y* para el test. Se le puso `.accessibilityLabel`.
 - [ ] **E2E-06** Marcar un suplemento y verlo reflejado en Progreso.
 - [ ] **E2E-07** Crear, editar y borrar un día en la tab Plan.
 - [ ] **E2E-08** Completar una corrida (km + minutos) y ver el ritmo calculado.

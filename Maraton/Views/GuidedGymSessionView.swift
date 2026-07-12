@@ -67,6 +67,8 @@ struct GuidedGymSessionView: View {
                         } label: {
                             Image(systemName: "arrow.triangle.swap")
                         }
+                        // Sin esto el botón es un ícono mudo: VoiceOver no lo sabe nombrar.
+                        .accessibilityLabel("Cambiar ejercicio")
                     }
                 }
             }
