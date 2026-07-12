@@ -39,7 +39,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`. | I-34 |
 | 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
 | 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. | I-21 |
-| 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. ✅ **`recentWeeks` confirmado por lectura, NO alcanzable** (U-27): único call site = `ProgressDashboardView`, sin pasar `count`. **No se puede testear el crash** —un `fatalError` mataría toda la suite— así que el test fija el borde seguro (0 → `[]`) y la contención. Falta ver `recentImprovements` (U-35). | U-27 ✅, U-35 |
+| 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. ✅ **CONFIRMADO por lectura, NO alcanzable** (las dos mitades). **No se puede testear el crash** —mataría toda la suite en paralelo— así que los tests fijan el borde seguro (`0` → `[]`) y la **contención**: los tres call sites (`ProgressDashboardView` ×2, `ProgressReportBuilder`) usan el **default** y ninguna UI produce un negativo. Fix cuando se haga configurable: `max(0, ...)`. | U-27 ✅, U-35 ✅ |
 | **12** | 🆕 **Reabrir un día terminado reinicia la sesión.** ✅ **CONFIRMADO y alcanzable** (I-15). `firstIncompleteIndex` hace `firstIndex { … } ?? 0`: sin series pendientes devuelve **0**, indistinguible de "la primera está pendiente". El botón "Empezar sesión guiada" **no está gateado por `isCompleted`**, así que abrir un día ya entrenado te deja en la serie 1 con el botón de completar listo — y seguir el flujo arranca un descanso de 90 s y rehace la sesión. La fase `.done` solo la pone `finish()`, o sea que **vive en memoria y no sobrevive a cerrar la sesión**. Datos no se pierden. **Pendiente de arreglar** — ⚠️ **ojo con el fix**: ver la nota de abajo. | I-15 ✅ |
 | **13** | 🆕 **Un "Anterior" que llega tarde resucita una sesión terminada.** ✅ **CONFIRMADO** (I-19). `apply(.goBack)` es el **único** comando sin guarda de fase: su `else if index > 0` se cumple igual en `.done`. La carrera es real: el espejo del iPhone dibuja "Anterior" en la fase de carga, y entre el toque y la llegada del comando al reloj hay un viaje de WatchConnectivity. Efecto: la sesión vuelve a `.logging`, el índice retrocede y **des-marca la anteúltima serie** (no la última), dejando el día **marcado como completo pero con un hueco**. Nadie lo devuelve a `.done`. **A diferencia de los bugs 3, 5 y 6, la UI no lo tapa** — la guarda que falta es precisamente contra la ventana en que la UI está vieja. **Pendiente de arreglar.** | I-19 ✅ |
 | **14** | 🆕 **El espejo del iPhone cuenta una serie que no hiciste.** ✅ **CONFIRMADO y alcanzable** (I-11 → I-20). `loggedSetsCount` cuenta series **con datos** (`reps != nil \|\| weight != nil`), y el prellenado (I-17) ya le pone reps y peso a la serie actual. Al abrir la sesión, sin confirmar nada, `LiveSessionMirrorView` ya muestra **"1 series"**. `totalVolume` arrastra el mismo error (70 kg × 8 reps de una serie sin hacer). **En el resumen final los dos números son correctos** —ahí no queda ninguna prellenada de más— así que es un defecto del **espejo en vivo**, no del registro. Cosmético. | I-20 ✅ |
@@ -400,9 +400,20 @@ ninguna red.
       muestran los ejercicios **más recientes**, no los que más subieron.
       ⚠️ El % **solo mira el peso**: mismo peso con 4 reps más → **0%**. El contrato es "variación
       del peso", pero el tipo se llama `ExerciseImprovement` y promete más de lo que mide.
-- [ ] **U-35** ⚠️ **Bug 11.** `limit: 0` → `[]`, pero `limit: -1` → **crash**. Y ⚠️ `percentChange`
-      **puede ser negativo** — el tipo se llama "improvement" pero incluye retrocesos: fijar el
-      contrato.
+- [x] **U-35** ⚠️ **Bug 11 (segunda mitad), CONFIRMADO por lectura, NO alcanzable.**
+      `limit: 0` → `[]`; `limit: -1` → `prefix(-1)` → *precondition failure*. Como en U-27, **no se
+      testea el crash** (mataría la suite en paralelo): se fija el borde seguro y la **contención**.
+      Los dos call sites (`ProgressDashboardView.improvements`, `ProgressReportBuilder.build`) usan
+      el **default de 5** y no hay UI que produzca un negativo. El día que "cuántos ejercicios
+      mostrar" sea configurable, hace falta `max(0, limit)`.
+      ⚠️ `percentChange` **puede ser negativo**: el contrato real es **variación**, no mejora. Los
+      retrocesos no se filtran (100 → 90 = −10%) y las dos vistas ya lo asumen (rojo el negativo).
+      El que engaña es el nombre del tipo, no el cálculo. **Inconsistencia menor:** con 0%,
+      `StrengthEvolutionCard` lo pinta gris y `ReportView` verde (`>= 0`).
+      ⚠️ **Asimetría del peso 0:** un 0 en la sesión **anterior** descarta el ejercicio (el guard
+      `anterior.top.weight > 0` evita dividir por cero → "+inf%"), pero un 0 en la sesión **nueva**
+      pasa y reporta **−100%**. Defendible (pasar de +10 kg a peso corporal *es* −100% de carga
+      externa), pero el mismo dato se ignora atrás y se reporta adelante.
 - [ ] **U-36** `ExerciseHistory.lastWeight` = el **mayor** peso de la última sesión anterior con
       datos. Ignora el día actual (comparación con `<` estricto).
 - [ ] **U-37** ⚠️ **Asimetría:** `lastWeight` sigue buscando hacia atrás si la última sesión no
