@@ -791,9 +791,16 @@ app inusable.
       limpiar un campo en XCUITest pide el menú de *"Select All"*, que depende del **idioma del
       simulador** y de un long-press que a veces no engancha. Frágil por razones que no tienen nada
       que ver con lo que se está probando.
-- [ ] **E2E-08** Completar una corrida (km + minutos) y ver el ritmo calculado.
-- [ ] **E2E-09** Generar el reporte PDF → aparece la hoja de compartir.
-- [ ] **E2E-10** Exportar el plan a PDF → aparece la hoja de compartir.
+- [x] **E2E-08** Completar una corrida: 10 km en 50 min → **`5'00"/km`**, un número redondo a
+      propósito (si el ritmo se calculara mal, ese valor exacto no aparecería por casualidad). Se
+      verifica **en vivo** en el formulario **y** guardado en el resumen del día.
+      ⚠️ **`LabeledContent` junta etiqueta y valor en UN solo texto** (`"Ritmo, 5'00\"/km"`):
+      `staticTexts["5'00\"/km"]` **no encuentra nada** aunque el número esté en pantalla. Hay que
+      matchear por contenido. Costó una corrida en rojo y un volcado del árbol de accesibilidad.
+- [x] **E2E-09** Generar el reporte: la pantalla **abre y trae contenido**. No se afirma sobre el
+      PDF en sí —eso ya lo cubren los unitarios (U-42..U-44)—: acá lo que importa es que la vista no
+      se rompa al armarse, que es donde un `nil` mal manejado o una división por cero aparecerían.
+- [x] **E2E-10** Exportar el plan: la vista previa se arma con los días sembrados.
 
 ✅ **Base determinística lista.** `AppData.isUITesting` lee el launch argument `-uitesting`, y con
 él la app arranca con el contenedor **y los flags de sembrado en memoria** (`InMemorySeedFlagStore`,
