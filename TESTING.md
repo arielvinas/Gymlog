@@ -202,9 +202,17 @@ La función más pura del repo y la que más casos raros tiene.
       una corrida de menos de un minuto, o carga manual) da ritmo 0 → `"0'00\"/km"` en el detalle
       y en el export. No rompe; miente menos que un guion. Alcanzable.
       Sin tramo de horas, igual que U-07: `3700 → "61'40\"/km"`.
-- [ ] **U-11** `Date.dayMonth` / `.weekdayAndDay` / `.longDate` en es-AR. Comparar contra un
-      `DateFormatter` construido en el test, **no** contra strings literales: las abreviaturas de
-      mes de es-AR cambian entre versiones de iCU (`"may"` vs `"may."`).
+- [x] **U-11** `Date.dayMonth` / `.weekdayAndDay` / `.longDate` (+ `.weekdayDayMonth`,
+      `.weekdayName`) en es-AR. ✅ Comparados contra un `DateFormatter` construido en el test, **no**
+      contra literales: si iCU cambia las abreviaturas cambian los dos lados y el test sigue
+      diciendo lo que quiere decir.
+      La capitalización **es deliberada, no despareja**: las tres que encabezan una tarjeta llevan
+      mayúscula inicial (el español no capitaliza días ni meses, por eso el `capitalizedFirst` a
+      mano), pero `weekdayName` va en minúscula **a propósito** porque se mete dentro de una frase
+      ("entrenás el jueves"). Emparejarlas rompe las frases.
+      Locale clavado en `es_AR`, igual que U-09. Y queda fijado que `date()` construye **al
+      mediodía**: los formateadores no fijan `timeZone`, así que el mediodía es lo que evita que
+      una zona horaria corra la fecha de día. De eso dependen todos los tests con fechas.
 
 ### Serialización de la sesión en vivo (`Shared/LiveSession/LiveSessionState.swift`)
 
