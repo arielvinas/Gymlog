@@ -322,7 +322,12 @@ ninguna red.
       repetidas), cada una con **sus propios** datos, y `count: 1` devuelve solo la de hoy.
       El orden **no es cosmético**: la vista dibuja el arreglo tal cual, así que invertirlo haría
       leer la tendencia al revés — parecería que bajás cuando subís.
-- [ ] **U-26** `recentWeeks` sin datos → 6 semanas en cero (es el caso que dibuja la tarjeta vacía).
+- [x] **U-26** `recentWeeks` sin datos → **6 semanas en cero, no una lista vacía**. ✅ Importa: con
+      seis ceros la tarjeta dibuja su eje y sus seis barras planas; con una lista vacía la vista
+      necesitaría un caso especial. Las fechas siguen siendo reales.
+      También: los datos **fuera de la ventana** no se filtran hacia adentro (entrenó hace tres
+      meses → seis ceros), y una semana con datos entre semanas vacías **no contamina** a las
+      vecinas (cada barra se calcula sola).
 - [ ] **U-27** ⚠️ **Bug 11.** `recentWeeks(0)` → `[]`, pero `recentWeeks(-1)` → **crash**.
 - [ ] **U-28** La semana arranca el **lunes**. Test con un domingo y el lunes siguiente.
 - [ ] **U-29** Cruce de año (semana del 29/12 al 4/1).

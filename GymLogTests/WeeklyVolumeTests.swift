@@ -351,4 +351,68 @@ struct WeeklyVolumeTests {
         #expect(semanas.count == 1)
         #expect(semanas[0].runKm == 8)
     }
+
+    // MARK: - U-26
+
+    // La tarjeta vacía: lo que ve alguien que recién instaló la app, o que no entrenó en seis
+    // semanas. Importa que devuelva **seis ceros** y no una lista vacía — con seis ceros la
+    // tarjeta dibuja su eje y sus seis barras planas, y se entiende que no hay datos. Con una
+    // lista vacía no habría nada que dibujar, y la vista tendría que inventar un caso especial.
+
+    @Test("U-26 · Sin datos, seis semanas en cero (y no una lista vacía)")
+    func noDataStillGivesSixWeeks() {
+        let semanas = WeeklyVolume.recentWeeks(6, days: [], exercises: [], today: miercoles)
+
+        #expect(semanas.count == 6, "La tarjeta necesita sus seis barras")
+        #expect(semanas.allSatisfy { $0.runKm == 0 && $0.tonnage == 0 })
+
+        // Y las fechas siguen siendo reales: el eje horizontal tiene sus seis semanas, aunque
+        // las barras estén planas.
+        #expect(Set(semanas.map(\.weekStart)).count == 6)
+    }
+
+    @Test("U-26 · Con datos viejos pero nada reciente, también seis ceros")
+    func dataOutsideTheWindowDoesNotLeakIn() throws {
+        let db = TestDB()
+
+        // Entrenó hace tres meses y paró. La ventana de seis semanas no lo alcanza.
+        makeDay(date(2026, 3, 10), type: .rodaje, title: "Rodaje 10 km",
+                isCompleted: true, actualKm: 10, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+        let semanas = WeeklyVolume.recentWeeks(6, days: dias, exercises: [], today: miercoles)
+
+        // Los 10 km existen en la base, pero no en estas seis semanas. La tarjeta no los
+        // arrastra hacia adelante: muestra la verdad incómoda de que hace mes y medio que no
+        // entrena.
+        #expect(semanas.count == 6)
+        #expect(semanas.allSatisfy { $0.runKm == 0 })
+    }
+
+    @Test("U-26 · Una semana con datos entre semanas vacías no las contamina")
+    func aSingleActiveWeekDoesNotFillTheRest() throws {
+        let db = TestDB()
+
+        // Entrenó una sola vez, el 27/5. Hoy es el miércoles 17/6, o sea que esa fecha cae
+        // **cuatro** semanas atrás: 15/6 (hoy), 8/6, 1/6, 25/5. Con seis barras, la del 25/5
+        // es la tercera.
+        makeDay(date(2026, 5, 27), type: .rodaje, title: "Rodaje 12 km",
+                isCompleted: true, actualKm: 12, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+        let semanas = WeeklyVolume.recentWeeks(6, days: dias, exercises: [], today: miercoles)
+
+        // Un solo pico, ceros alrededor. Ninguna semana hereda el valor de la anterior: cada
+        // barra se calcula sola, contra su propia semana.
+        #expect(semanas.map(\.runKm) == [0, 0, 12, 0, 0, 0])
+
+        // Y el pico cae donde tiene que caer: la semana que **contiene** al 27/5 empieza el
+        // 25/5. Lo verifico contra el calendario en vez de confiar en mi conteo de barras.
+        let cal = PlanConstants.calendar
+        let semanaDelPico = try #require(semanas.first { $0.runKm == 12 })
+        let inicioEsperado = try #require(
+            cal.dateInterval(of: .weekOfYear, for: date(2026, 5, 27))?.start
+        )
+        #expect(semanaDelPico.weekStart == inicioEsperado)
+    }
 }
