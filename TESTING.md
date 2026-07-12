@@ -29,7 +29,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 
 | # | Bug | Test |
 |---|---|---|
-| 1 | **`StrengthSeed.templates(for:)` matchea `title.contains("b")` sobre el título en minúsculas** → cualquier día con una "b" en cualquier parte ("Gimnasio **b**ásico", "Fuerza A · **B**loque") recibe la rutina del **Día B**. | U-18 |
+| 1 | **`StrengthSeed.templates(for:)` matchea `title.contains("b")`** → cualquier día con una "b" en cualquier parte recibe la rutina del **Día B**. ✅ **CONFIRMADO y alcanzable** (U-18): el título **lo edita el usuario** (`WorkoutEditView` lo expone en un `TextField`) y `populateIfNeeded` relee el título actual. Renombrar un día A a "Fuerza A · brazos" —o a cualquier cosa con una b— lo llena con la rutina del Día B. Con los títulos del plan funciona **de casualidad**: ninguno de Día A tiene una "b". **Pendiente de arreglar.** | U-18 ✅ |
 | 2 | **`StreakCalculator.currentWeekStreak` agrupa por `weekTitle` (String), no por semana calendario** → dos semanas con el mismo título se fusionan; una semana partida en dos títulos cuenta doble. | U-32 |
 | 3 | ~~**`GuidedSessionEngine`: con `restSeconds == 0`, `onStateChanged` nunca se emite al entrar en tiempo extra**~~ → **confirmado pero NO alcanzable.** El 0 no se puede producir hoy por ninguna ruta. Agujero de la lógica, no bug visible. Ver I-06. | I-06 ✅ |
 | 4 | **Ráfaga de alertas al volver de background.** ✅ **CONFIRMADO** en I-07: vuelve con 35 s de tiempo extra → **4 vibraciones en <1 s**. Alcanzable a diario (el reloj apaga la pantalla y deja de tickear). **Pendiente de arreglar.** | I-07 ✅ |
@@ -240,9 +240,16 @@ ninguna red.
 
 ### Plantillas de fuerza (`Shared/StrengthSeed.swift`)
 
-- [ ] **U-18** ⚠️ **Bug 1.** `templates(for:)` elige Día A o Día B por título. **Hoy
-      `title.contains("b")` matchea cualquier "b"** → `"Gimnasio básico"` cae en Día B. Test que lo
-      expone.
+- [x] **U-18** ⚠️ **Bug 1 — CONFIRMADO y alcanzable.** ✅ `templates(for:)` elige la rutina con
+      `title.contains("b")`, que no busca "el Día B" sino **la letra b en cualquier lugar**.
+      Alcanzable porque el título **lo edita el usuario** y `populateIfNeeded` relee el actual:
+      renombrar un día A a `"Fuerza A · brazos"`, `"Gimnasio básico"` o `"Hombros y abdominales"`
+      lo llena con la rutina del **Día B** — otros ejercicios, otras series.
+      Con los títulos del plan anda **de casualidad**: ninguno de Día A tiene una "b".
+      Y `"liviana"` solo le gana a la `"b"` porque su `if` va **primero** — probado con
+      `"Fuerza liviana (banco)"`, que tiene las dos. Reordenar los `if` cambiaría la rutina.
+      El arreglo natural: un campo explícito en el día (un `enum` de rutina), no adivinar del texto.
+      **Pendiente de arreglar.**
 - [ ] **U-19** ⚠️ Un día "liviana" → `taperVariant`: mitad de series redondeando hacia arriba
       (`2→1`, `3→2`, `4→2`, `0→0`). **El comentario dice "sin trabajo de pierna" pero solo saca
       "Flexión de rodillas"** — deja aductores y extensión de rodillas.
