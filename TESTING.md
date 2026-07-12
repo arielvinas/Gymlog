@@ -359,7 +359,13 @@ ninguna red.
 
 ### Racha (`StreakCalculator`)
 
-- [ ] **U-30** `currentWeekStreak` cuenta semanas consecutivas con al menos un día completado.
+- [x] **U-30** `currentWeekStreak` cuenta semanas consecutivas con al menos un día completado. ✅
+      Alcanza con **un** día por semana (`contains { isCompleted }`, no "todos"). Una semana en
+      blanco corta. Sin nada completado → 0 (y con la base vacía, también). Las **semanas futuras
+      del plan no cuentan** — importa, porque el plan siembra los días por adelantado y la base
+      siempre tiene futuro.
+      La unidad es la **semana** y no el día justamente porque el plan tiene descansos: contar días
+      obligaría a decidir si un descanso corta la racha, y cualquier respuesta sería arbitraria.
 - [ ] **U-31** Una semana en curso sin completar **no corta** la racha (se cuenta desde la última
       semana activa hacia atrás).
 - [ ] **U-32** ⚠️ **Bug 2.** Agrupa por `weekTitle` (String), no por semana calendario. Test con
