@@ -244,4 +244,98 @@ struct StrengthSeedTests {
         // —lo natural, si el flag existe—, el día de taper va a empezar a pedir kilos para
         // el puente lateral y el equilibrio en bosu.
     }
+
+    // MARK: - U-20
+
+    // El segundo filtro, independiente del título: en las semanas de **pico de volumen**
+    // (15–21/6) y de **taper** (29/6–5/7) se sacan los ejercicios de salto, para no cargar
+    // las articulaciones cuando la pierna ya está exigida por el running.
+
+    @MainActor
+    private func nombresEn(_ fecha: Date, title: String, in context: ModelContext) -> [String] {
+        StrengthSeed.templates(for: makeDay(fecha, type: .fuerza, title: title, in: context))
+            .map(\.name)
+    }
+
+    @Test(
+        "U-20 · Dentro de las dos ventanas no hay saltos; fuera, sí",
+        arguments: [
+            // Semana de pico: 15 al 21 de junio, los dos bordes incluidos.
+            (date(2026, 6, 14), false),  // víspera
+            (date(2026, 6, 15), true),   // primer día
+            (date(2026, 6, 18), true),
+            (date(2026, 6, 21), true),   // último día
+            (date(2026, 6, 22), false),  // día siguiente
+            // Entre las dos ventanas hay una semana normal.
+            (date(2026, 6, 25), false),
+            // Semana de taper: 29 de junio al 5 de julio.
+            (date(2026, 6, 28), false),  // víspera
+            (date(2026, 6, 29), true),   // primer día
+            (date(2026, 7, 5), true),    // último día
+            (date(2026, 7, 6), false),   // día siguiente
+        ]
+    )
+    func jumpsAreOmittedOnlyInsideTheTwoWindows(fecha: Date, sinSaltos: Bool) {
+        let db = TestDB()
+
+        // Los dos bordes de cada ventana son inclusivos (`>=` y `<=`), y la comparación es
+        // por `startOfDay`, así que la hora del día no cambia el resultado.
+        let diaA = nombresEn(fecha, title: "Fuerza A", in: db.context)
+        #expect(diaA.contains("Salto de paracaidista") == !sinSaltos)
+
+        let diaB = nombresEn(fecha, title: "Fuerza B", in: db.context)
+        #expect(diaB.contains("Salto sobre step a una pierna") == !sinSaltos)
+    }
+
+    @Test("U-20 · El filtro saca los saltos y no toca nada más")
+    func theFilterOnlyRemovesJumps() {
+        let db = TestDB()
+
+        let normal = nombresEn(date(2026, 6, 10), title: "Fuerza A", in: db.context)
+        let enPico = nombresEn(date(2026, 6, 18), title: "Fuerza A", in: db.context)
+
+        // Exactamente un ejercicio de diferencia, y es el salto.
+        #expect(normal.count == enPico.count + 1)
+        #expect(Set(normal).subtracting(enPico) == ["Salto de paracaidista"])
+    }
+
+    @Test("U-20 · ⚠️ Las ventanas están clavadas a 2026 y ya pasaron")
+    func theWindowsAreHardcodedToAPastRace() {
+        let db = TestDB()
+
+        // `omitsJumps` compara contra fechas literales de 2026: 15–21/6 y 29/6–5/7. Eran las
+        // semanas de pico y taper **de la carrera del 5/7/2026**, que ya se corrió.
+        //
+        // Consecuencia: para cualquier día de hoy en adelante, el filtro **nunca** se activa.
+        // La app ya no es un plan de media maratón —es GymLog, entrenamiento continuo— así
+        // que estas dos ventanas son código muerto que espera a un evento que no vuelve.
+        let hoy = nombresEn(date(2026, 7, 11), title: "Fuerza A", in: db.context)
+        #expect(hoy.contains("Salto de paracaidista"))
+
+        // Y en 2027 tampoco: las mismas semanas del calendario no matchean, porque el año
+        // está en la constante.
+        let mismaSemanaEn2027 = nombresEn(date(2027, 6, 18), title: "Fuerza A", in: db.context)
+        #expect(mismaSemanaEn2027.contains("Salto de paracaidista"))
+
+        // No es un bug —hoy nadie espera que se saquen los saltos— pero es deuda con nombre:
+        // si el taper vuelve a hacer falta (otra carrera), esto hay que rehacerlo relativo a
+        // una fecha objetivo, no clavado. Va con la deuda de HANDOFF: "el plan se quedó sin
+        // días" el 5/7/2026.
+    }
+
+    @Test("U-20 · El taper de julio combina los dos filtros")
+    func theJulyTaperCombinesBothFilters() {
+        let db = TestDB()
+
+        // El único día donde los dos filtros se cruzan: título "liviana" (mitad de series) y
+        // fecha dentro de la ventana de taper (sin saltos). Se aplican en orden —primero la
+        // variante, después el filtro por fecha— y no se pisan.
+        let dia = makeDay(date(2026, 7, 1), type: .fuerza,
+                          title: "Fuerza liviana (tren superior)", in: db.context)
+        let rutina = StrengthSeed.templates(for: dia)
+
+        #expect(!rutina.contains { $0.name.contains("Salto") }, "El filtro de fecha sacó el salto")
+        #expect(!rutina.contains { $0.name.contains("Flexión de rodillas") }, "El taper sacó la flexión")
+        #expect(rutina.allSatisfy { $0.sets <= 2 }, "Y las series están partidas al medio")
+    }
 }

@@ -271,7 +271,16 @@ ninguna red.
       `insert()` no lee ese flag y `tracksWeight` resuelve **por nombre** contra las listas
       originales. El día que alguien haga que `insert()` use `template.weighted` —lo natural—, el
       día de taper va a pedir kilos para el puente lateral y el equilibrio en bosu.
-- [ ] **U-20** Semana de pico (15-21/6) y taper (29/6-5/7): se filtran los ejercicios de salto.
+- [x] **U-20** Semana de pico (15-21/6) y taper (29/6-5/7): se filtran los ejercicios de salto. ✅
+      Los dos bordes son inclusivos y la comparación va por `startOfDay` (la hora no influye).
+      Saca exactamente el salto y nada más. Es un filtro **independiente del título**: en el día de
+      taper del 1/7 se combinan los dos (mitad de series **y** sin salto) sin pisarse.
+      ⚠️ **Las ventanas están clavadas a 2026 y ya pasaron.** Eran el pico y el taper de la carrera
+      del 5/7/2026. Para cualquier día de hoy en adelante el filtro **nunca** se activa, y en 2027
+      tampoco (el año está en la constante). No es un bug —nadie espera hoy que se saquen los
+      saltos— pero es **código muerto esperando un evento que no vuelve**. Si el taper hace falta
+      otra vez, hay que rehacerlo **relativo a una fecha objetivo**. Va con la deuda de HANDOFF
+      ("el plan se quedó sin días" el 5/7/2026).
       Bordes exactos: 14/6 no, 15/6 sí, 21/6 sí, 22/6 no, 28/6 no, 29/6 sí, 5/7 sí, 6/7 no.
 - [ ] **U-21** `tracksWeight`: los de peso corporal / banda / core / salto → `false`. Los
       desconocidos → `true`. Es **case-sensitive y exacto**.
