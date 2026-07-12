@@ -116,17 +116,24 @@ quedan como **checklist manual** antes de cada release:
       > proceso**, que aparecen como fallados sin mensaje. Por eso `TestSupport` expone `TestDB`,
       > que guarda contenedor y contexto juntos: **guardalo en una variable del test.**
 
-- [ ] **P0-4 · Flags de sembrado inyectables.** Los seeds leen y escriben **6 claves globales**
-      (`seededPlanVersion`, `seededStrengthVersion`, `cleanedKneeRecoveryV1`, cada una en
-      `UserDefaults.standard` **y** en `NSUbiquitousKeyValueStore.default`). Un test tendría que
-      resetear las 6, y aun así el resultado dependería de si el bundle de tests tiene entitlement
-      de iCloud: el KVS sin entitlement devuelve 0/false y **descarta escrituras en silencio**. Es
-      una fábrica de flakes. Extraer `protocol SeedFlagStore` + una implementación en memoria.
-      **Bloquea I-19..I-36.**
+- [x] **P0-4 · Flags de sembrado inyectables.** ✅ Hecho. `Shared/SeedFlagStore.swift`: un
+      `protocol SeedFlagStore` (integer/bool + setters) y `DefaultSeedFlagStore`, que encapsula las
+      dos capas (`UserDefaults` + Key-Value Store de iCloud) y la regla de resolución —**gana el
+      valor más alto**, así una instalación nueva no re-siembra lo que otro dispositivo ya sembró—.
+      Los tres bloques que repetían esa lógica (`WorkoutSeed.storedVersion`/`markSeeded`,
+      `WorkoutSeed.kneeCleanupApplied`/`markKneeCleanupApplied`, `StrengthSeed.storedVersion`/
+      `markSeeded`) ahora son una línea cada uno contra `AppData.seedFlags`, el **único punto de
+      inyección**. `InMemorySeedFlagStore` vive en `GymLogTests/SeedFlagStoreTests.swift` (no en
+      `Shared/`) para no dejar código muerto en la app. **Desbloquea I-21..I-32.**
 
-- [ ] **P0-5 · `AppData.iCloudSyncEnabled` es `static let`** (`Shared/AppData.swift:20`) → la rama
-      "sin iCloud" de los seeds es inalcanzable desde un test. Pasarlo a `static var` o derivarlo
-      del store de P0-4.
+- [x] **P0-5 · La rama "sin iCloud" ahora es alcanzable.** ✅ Hecho, sin convertir
+      `AppData.iCloudSyncEnabled` en un global mutable —que hubiera sido peor—: la rama es
+      `DefaultSeedFlagStore(cloud: nil)`, y se elige **construyendo el store**. El default sigue
+      derivándose de `iCloudSyncEnabled`, así que en producción no cambia nada.
+      ⚠️ La rama **con** iCloud no se testea contra el KVS real a propósito: sin entitlement
+      devuelve 0/false y **descarta las escrituras en silencio**, así que el test pasaría por la
+      razón equivocada y se rompería el día que el bundle sí lo tenga. Se fija la mitad
+      verificable: **la capa de la nube nunca se come el valor local**.
 
 - [ ] **P0-6 · Reloj inyectable en el engine** *(mejora, no bloqueante)*. `startRest`, `adjustRest`
       y `makeSnapshot` usan `Date()` interno; `tickRest(now:)` **ya** recibe la fecha. Los tests del

@@ -184,18 +184,11 @@ enum StrengthSeed {
     private static let newPlanCutoff = DateComponents.makeDate(year: 2026, month: 6, day: 9)
 
     private static var storedVersion: Int {
-        let local = UserDefaults.standard.integer(forKey: versionKey)
-        guard AppData.iCloudSyncEnabled else { return local }
-        let cloud = Int(NSUbiquitousKeyValueStore.default.longLong(forKey: versionKey))
-        return max(cloud, local)
+        AppData.seedFlags.integer(forKey: versionKey)
     }
 
     private static func markSeeded() {
-        UserDefaults.standard.set(version, forKey: versionKey)
-        if AppData.iCloudSyncEnabled {
-            NSUbiquitousKeyValueStore.default.set(Int64(version), forKey: versionKey)
-            NSUbiquitousKeyValueStore.default.synchronize()
-        }
+        AppData.seedFlags.setInteger(version, forKey: versionKey)
     }
 
     /// Carga la rutina en los días de fuerza. En los días vacíos crea la rutina

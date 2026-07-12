@@ -172,18 +172,11 @@ enum WorkoutSeed {
     /// Key-Value Store (que sincroniza) para no re-sembrar ni duplicar al
     /// reinstalar o estrenar un dispositivo nuevo; si no, sólo local.
     private static var storedVersion: Int {
-        let local = UserDefaults.standard.integer(forKey: versionKey)
-        guard AppData.iCloudSyncEnabled else { return local }
-        let cloud = Int(NSUbiquitousKeyValueStore.default.longLong(forKey: versionKey))
-        return max(cloud, local)
+        AppData.seedFlags.integer(forKey: versionKey)
     }
 
     private static func markSeeded(_ version: Int) {
-        UserDefaults.standard.set(version, forKey: versionKey)
-        if AppData.iCloudSyncEnabled {
-            NSUbiquitousKeyValueStore.default.set(Int64(version), forKey: versionKey)
-            NSUbiquitousKeyValueStore.default.synchronize()
-        }
+        AppData.seedFlags.setInteger(version, forKey: versionKey)
     }
 
     /// Inserta el plan en el primer arranque, sólo si no se sembró antes y no
@@ -272,17 +265,11 @@ enum WorkoutSeed {
     private static let kneeCleanupKey = "cleanedKneeRecoveryV1"
 
     private static var kneeCleanupApplied: Bool {
-        let local = UserDefaults.standard.bool(forKey: kneeCleanupKey)
-        guard AppData.iCloudSyncEnabled else { return local }
-        return local || NSUbiquitousKeyValueStore.default.bool(forKey: kneeCleanupKey)
+        AppData.seedFlags.bool(forKey: kneeCleanupKey)
     }
 
     private static func markKneeCleanupApplied() {
-        UserDefaults.standard.set(true, forKey: kneeCleanupKey)
-        if AppData.iCloudSyncEnabled {
-            NSUbiquitousKeyValueStore.default.set(true, forKey: kneeCleanupKey)
-            NSUbiquitousKeyValueStore.default.synchronize()
-        }
+        AppData.seedFlags.setBool(true, forKey: kneeCleanupKey)
     }
 
     /// Fechas que ocupó la etapa de recuperación de rodilla.

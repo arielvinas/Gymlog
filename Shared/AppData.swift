@@ -30,6 +30,12 @@ enum AppData {
 
     static let log = Logger(subsystem: "ariel.Maraton", category: "AppData")
 
+    /// Dónde guardan los seeds sus flags ("¿qué versión ya sembré?"). Es el **único** punto de
+    /// inyección: los tests lo reemplazan por un store en memoria para no depender de
+    /// `UserDefaults` ni del Key-Value Store de iCloud (que sin entitlement descarta las
+    /// escrituras en silencio). Ver `SeedFlagStore`.
+    static var seedFlags: SeedFlagStore = DefaultSeedFlagStore()
+
     /// `true` cuando el proceso es la app hosteando el bundle de tests unitarios.
     /// XCTest sólo define esta variable en el proceso que hostea los unitarios: en
     /// los tests de UI la app corre como proceso aparte y arranca normal.
