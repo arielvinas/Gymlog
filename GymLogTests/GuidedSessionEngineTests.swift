@@ -2030,4 +2030,166 @@ struct GuidedSessionEngineTests {
         #expect(engine.phase == .done)
         #expect(cambios == 1, "El segundo cierre no vuelve a difundir")
     }
+
+    // MARK: - I-20
+
+    // `makeSnapshot` es lo que el reloj le manda al iPhone. Cierra el lazo: el engine produce
+    // el snapshot, `LiveSessionWire` lo serializa (ver U-12..U-17), y del otro lado se dibuja
+    // el espejo y la Live Activity. Si un campo miente, miente en la pantalla de bloqueo.
+
+    @Test("I-20 · El snapshot refleja dónde estás parado")
+    func theSnapshotReflectsTheCurrentStep() throws {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.beginLiveSession()
+
+        let s = engine.makeSnapshot(heartRate: 132)
+
+        #expect(s.sessionID == engine.sessionID)
+        #expect(s.dayDate == day.date)
+        #expect(s.phase == .logging)
+        #expect(s.exerciseName == "Press banca")
+        #expect(s.exerciseIndex == 0)
+        #expect(s.exerciseCount == 2)
+        #expect(s.setNumber == 1)
+        #expect(s.setCount == 3)
+        #expect(s.targetReps == "6-8")
+        #expect(!s.isBodyweight)
+        #expect(!s.isTimeBased)
+        #expect(s.reps == 8, "El prellenado ya viaja en el snapshot")
+
+        // El pulso lo inyecta la plataforma: el engine no conoce HealthKit.
+        #expect(s.heartRate == 132)
+    }
+
+    @Test("I-20 · El descanso solo viaja mientras se está descansando")
+    func theRestOnlyTravelsWhileResting() throws {
+        let db = TestDB()
+        let (engine, fin) = try engineResting(in: db)
+
+        var s = engine.makeSnapshot()
+        #expect(s.phase == .resting)
+        #expect(s.restEndDate == fin, "La cuenta la dibuja el iPhone solo, con esta fecha")
+        #expect(s.restTotal == 90)
+        #expect(!s.isOvertime)
+
+        // En tiempo extra el flag se enciende: es lo que pinta el descanso en rojo del otro
+        // lado.
+        engine.tickRest(now: fin.addingTimeInterval(5))
+        s = engine.makeSnapshot()
+        #expect(s.isOvertime)
+
+        // Y al salir del descanso la fecha desaparece. Si sobreviviera, el iPhone seguiría
+        // dibujando una cuenta regresiva sobre una serie que ya no descansa.
+        engine.skipRest()
+        s = engine.makeSnapshot()
+        #expect(s.phase == .logging)
+        #expect(s.restEndDate == nil)
+        #expect(!s.isOvertime)
+    }
+
+    @Test("I-20 · El progreso avanza con la sesión y llega a 1 al terminar")
+    func theProgressAdvancesWithTheSession() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Cargando la serie 1 de 5: todavía no hiciste nada.
+        #expect(engine.makeSnapshot().progressFraction == 0)
+
+        // Descansando después de la serie 1: contás la serie que acabás de hacer. Por eso
+        // `.resting` usa `index + 1` y `.logging` usa `index`.
+        engine.completeCurrent()
+        #expect(engine.makeSnapshot().progressFraction == 0.2)
+
+        engine.skipRest()
+        #expect(engine.makeSnapshot().progressFraction == 0.2, "Cargando la 2: sigue 1 de 5 hecha")
+
+        for _ in 0..<3 {
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+        engine.completeCurrent()
+        #expect(engine.phase == .done)
+        #expect(engine.makeSnapshot().progressFraction == 1)
+    }
+
+    @Test("I-20 · ⚠️ El contador de series cuenta la que todavía no confirmaste")
+    func theLoggedSetsCounterCountsThePrefilledSet() throws {
+        let db = TestDB()
+        // Con historial, para que el prellenado también ponga peso.
+        historial("Press banca", on: date(2026, 6, 24), weights: [70], in: db.context)
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // ⚠️ Recién abierta la sesión, sin haber confirmado nada, el snapshot ya dice
+        // **1 serie**. `loggedSetsCount` cuenta series "con datos" (`reps != nil || weight
+        // != nil`), y el prellenado (I-17) ya le puso reps y peso a la serie actual.
+        //
+        // Se ve: `LiveSessionMirrorView` muestra "\(s.loggedSetsCount) series" en vivo. O sea
+        // que el espejo del iPhone dice "1 series" antes de que hagas la primera.
+        let s = engine.makeSnapshot()
+        #expect(s.loggedSetsCount == 1, "⚠️ Cuenta la prellenada, no la confirmada")
+
+        // El volumen arrastra el mismo error: 70 kg × 8 reps de una serie que no hiciste.
+        #expect(s.totalVolume == 560, "⚠️ Volumen de una serie sin confirmar")
+
+        // La contracara: **en el resumen final los dos números son correctos**, porque ahí
+        // todas las series están confirmadas y no queda ninguna prellenada de más. Y el
+        // resumen del reloj (`Series` / `Volumen`) es el lugar donde el usuario los mira de
+        // verdad. Por eso esto es un defecto del **espejo en vivo**, no del registro.
+        for _ in 0..<4 {
+            engine.currentStep?.set?.weight = 70
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+        engine.currentStep?.set?.weight = 70
+        engine.completeCurrent()
+
+        let final = engine.makeSnapshot()
+        #expect(final.phase == .done)
+        #expect(final.loggedSetsCount == 5, "Las 5 series del día, todas hechas")
+    }
+
+    @Test("I-20 · Un ejercicio de peso corporal o de tiempo se anuncia como tal")
+    func bodyweightAndTimeBasedTravelInTheSnapshot() {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, in: db.context)
+        makeExercise("Abdominales bisagra a dos piernas", on: day, order: 0,
+                     targetReps: "30 s", sets: [(nil, nil)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+
+        // Estos dos flags deciden qué ruedas dibuja el otro lado: sin peso, y contando
+        // segundos en vez de reps. Si viajaran mal, el iPhone te pediría kilos de una plancha.
+        let s = engine.makeSnapshot()
+        #expect(s.isBodyweight)
+        #expect(s.isTimeBased)
+        #expect(s.weight == nil)
+        #expect(s.reps == 30)
+    }
+
+    @Test("I-20 · El snapshot sobrevive el viaje por el canal")
+    func theSnapshotSurvivesTheWire() throws {
+        let db = TestDB()
+        let (engine, _) = try engineResting(in: db)
+
+        // El lazo completo: engine → snapshot → payload → snapshot. Es exactamente lo que
+        // pasa entre el reloj y el iPhone. Los tests de serialización (U-12..U-17) prueban el
+        // round-trip con snapshots armados a mano; este lo prueba con uno **real**, salido de
+        // una sesión en curso.
+        let original = engine.makeSnapshot(heartRate: 145)
+        let payload = try #require(LiveSessionWire.payload(for: original))
+        let recibido = try #require(LiveSessionWire.snapshot(from: payload))
+
+        #expect(recibido == original)
+    }
 }

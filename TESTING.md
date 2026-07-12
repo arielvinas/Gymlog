@@ -44,6 +44,8 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 
 | **13** | 🆕 **Un "Anterior" que llega tarde resucita una sesión terminada.** ✅ **CONFIRMADO** (I-19). `apply(.goBack)` es el **único** comando sin guarda de fase: su `else if index > 0` se cumple igual en `.done`. La carrera es real: el espejo del iPhone dibuja "Anterior" en la fase de carga, y entre el toque y la llegada del comando al reloj hay un viaje de WatchConnectivity. Efecto: la sesión vuelve a `.logging`, el índice retrocede y **des-marca la anteúltima serie** (no la última), dejando el día **marcado como completo pero con un hueco**. Nadie lo devuelve a `.done`. **A diferencia de los bugs 3, 5 y 6, la UI no lo tapa** — la guarda que falta es precisamente contra la ventana en que la UI está vieja. **Pendiente de arreglar.** | I-19 ✅ |
 
+| **14** | 🆕 **El espejo del iPhone cuenta una serie que no hiciste.** ✅ **CONFIRMADO y alcanzable** (I-11 → I-20). `loggedSetsCount` cuenta series **con datos** (`reps != nil \|\| weight != nil`), y el prellenado (I-17) ya le pone reps y peso a la serie actual. Al abrir la sesión, sin confirmar nada, `LiveSessionMirrorView` ya muestra **"1 series"**. `totalVolume` arrastra el mismo error (70 kg × 8 reps de una serie sin hacer). **En el resumen final los dos números son correctos** —ahí no queda ninguna prellenada de más— así que es un defecto del **espejo en vivo**, no del registro. Cosmético. | I-20 ✅ |
+
 Además, dos contradicciones entre el código y sus comentarios, que hay que resolver decidiendo
 cuál gana: `applyPlanUpdates` dice "los días que el usuario borre no se vuelven a insertar" pero
 compara por fecha (I-23), y `taperVariant` dice "sin el trabajo de pierna" pero solo saca
@@ -406,13 +408,12 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       queda sin marcar). Pero `apply(.goBack)` **no valida la fase**: desde `.done` resucita la
       sesión, retrocede el índice y **des-marca la anteúltima serie**, dejando el día completo con
       un hueco. **Pendiente de arreglar.**
-- [ ] **I-20** ⚠️ **Hallazgo de I-11:** `loggedSetsCount` —lo que la Live Activity muestra como
-      "series cargadas"— cuenta series **con datos** (`reps != nil || weight != nil`), y el
-      prellenado ya les pone las reps objetivo. O sea: cuenta la serie actual, todavía sin
-      confirmar. Arranca la sesión en 1, no en 0. Verificar si es lo que se quiso.
-- [ ] **I-20** `makeSnapshot` refleja fase, índice, progreso y pulso; `restEndDate` solo en
-      `.resting`. Round-trip por `LiveSessionWire` → snapshot equivalente. Cierra el lazo engine ↔
-      serialización.
+- [x] **I-20** `makeSnapshot` refleja paso, fase, índice, progreso y pulso (inyectado: el engine no
+      conoce HealthKit); `restEndDate` e `isOvertime` solo en `.resting`; `isBodyweight`/`isTimeBased`
+      viajan bien (deciden qué ruedas dibuja el otro lado). Round-trip por `LiveSessionWire` con un
+      snapshot **real** de una sesión en curso — cierra el lazo engine ↔ serialización. ✅
+      ⚠️ **Bug 14 confirmado acá** (venía de I-11): `loggedSetsCount` y `totalVolume` cuentan la
+      serie **prellenada y sin confirmar**. `progressFraction` sí está bien (deriva del índice).
 
 ### Seeds y migraciones *(requieren P0-3, P0-4, P0-5)*
 
