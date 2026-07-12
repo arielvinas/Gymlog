@@ -62,4 +62,52 @@ struct TimeFormattingTests {
         #expect(3600.restLabel == "60 min")
         #expect(3661.restLabel == "61:01 min")
     }
+
+    // MARK: - U-07
+
+    // `countdownLabel` es el número grande del descanso: el que mirás en la muñeca mientras
+    // esperás. A diferencia de `restLabel`, **siempre** tiene la misma forma (`m:ss`), porque
+    // es un número que cambia cada segundo: si alternara entre "1:30" y "45 s" saltaría de
+    // ancho a mitad de la cuenta.
+
+    @Test(
+        "U-07 · La cuenta regresiva siempre tiene la forma m:ss",
+        arguments: [
+            (90, "1:30"),
+            (60, "1:00"),
+            (59, "0:59"),
+            // Con un solo dígito el cero a la izquierda es lo que evita que "0:5" se lea
+            // como cinco décimas o como cinco minutos.
+            (5, "0:05"),
+            (1, "0:01"),
+            // El final de la cuenta. No es un caso raro: es el que se ve justo antes de
+            // entrar en tiempo extra.
+            (0, "0:00"),
+            // Descansos largos, y los minutos altos del tiempo extra.
+            (150, "2:30"),
+            (600, "10:00"),
+        ]
+    )
+    func countdownAlwaysUsesMinutesAndSeconds(seconds: Int, expected: String) {
+        #expect(seconds.countdownLabel == expected)
+    }
+
+    @Test("U-07 · El tiempo extra usa la misma etiqueta, con un + adelante")
+    func overtimeReusesTheSameLabel() {
+        // Las tres vistas (reloj, iPhone y espejo) hacen `"+\(segundos.countdownLabel)"`.
+        // O sea que esta misma función formatea las dos mitades del descanso: la que baja y
+        // la que sube. Por eso no puede tener un caso especial para el 0.
+        #expect("+\(35.countdownLabel)" == "+0:35")
+        #expect("+\(90.countdownLabel)" == "+1:30")
+    }
+
+    @Test("U-07 · Tampoco acá hay tramo de horas")
+    func noHoursHereEither() {
+        // Mismo límite que `restLabel`. Acá **sí** es alcanzable: el tiempo extra cuenta
+        // hacia arriba sin techo (ver I-05), así que una sesión abandonada con la pantalla
+        // abierta llega a "60:00" y sigue. No rompe nada —el número se lee igual— pero el
+        // ancho del texto crece y la vista no lo espera.
+        #expect(3600.countdownLabel == "60:00")
+        #expect(3665.countdownLabel == "61:05")
+    }
 }

@@ -171,7 +171,12 @@ La función más pura del repo y la que más casos raros tiene.
       cero a la izquierda (si no, `"1:5 min"` se leería como uno coma cinco).
       Límite conocido, no bug: **no hay tramo de horas** — `3600 → "60 min"`. Irrelevante para un
       descanso; importaría si se reusa la función para otra duración.
-- [ ] **U-07** `Int.countdownLabel`: `90 → "1:30"`, `5 → "0:05"`.
+- [x] **U-07** `Int.countdownLabel`: `90 → "1:30"`, `5 → "0:05"`. ✅ Siempre `m:ss`, sin caso
+      especial para el 0: **la misma función formatea las dos mitades del descanso**, la que baja y
+      la que sube (las tres vistas hacen `"+\(segundos.countdownLabel)"` en tiempo extra). Forma
+      fija porque es un número que cambia cada segundo: si alternara de forma, saltaría de ancho.
+      Acá el **no tener tramo de horas sí es alcanzable** —el tiempo extra no tiene techo (I-05)—
+      pero solo crece el ancho del texto: `3600 → "60:00"`.
 - [ ] **U-08** ⚠️ Negativos: `(-30).restLabel` → `"-30 s"`, `(-5).countdownLabel` → `"0:-5"`.
       `restRemaining` es `Int` — fijar qué se espera.
 - [ ] **U-09** `Double.formattedKm` / `.formattedKg`: separador decimal coma (es-AR), cero,
