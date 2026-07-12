@@ -194,7 +194,14 @@ La función más pura del repo y la que más casos raros tiene.
       ida y vuelta segura. Hoy ninguna ruta lo hace.
       El locale está **fijado a `es_AR`** a mano: un teléfono en inglés igual ve `12,5`. Decisión,
       no bug.
-- [ ] **U-10** `Double.formattedPace`: `330 → "5'30\"/km"`; redondeo; cero.
+- [x] **U-10** `Double.formattedPace`: `330 → "5'30\"/km"`; redondea (no trunca) los segundos
+      fraccionarios, que es lo normal porque el ritmo sale de una división. ✅
+      El `km > 0` de `paceSecondsPerKm` es lo que evita el `inf`: **sin ese guard,
+      `Int(inf.rounded())` crashea**. Testeado.
+      ⚠️ Pero **no exige `minutes > 0`**: un día con km y duración 0 (importación de HealthKit de
+      una corrida de menos de un minuto, o carga manual) da ritmo 0 → `"0'00\"/km"` en el detalle
+      y en el export. No rompe; miente menos que un guion. Alcanzable.
+      Sin tramo de horas, igual que U-07: `3700 → "61'40\"/km"`.
 - [ ] **U-11** `Date.dayMonth` / `.weekdayAndDay` / `.longDate` en es-AR. Comparar contra un
       `DateFormatter` construido en el test, **no** contra strings literales: las abreviaturas de
       mes de es-AR cambian entre versiones de iCU (`"may"` vs `"may."`).

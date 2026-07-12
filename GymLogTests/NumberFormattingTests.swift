@@ -88,4 +88,92 @@ struct NumberFormattingTests {
         #expect(12.5.formattedKm == "12,5")
         #expect(!12.5.formattedKm.contains("."))
     }
+
+    // MARK: - U-10
+
+    // El ritmo entra en **segundos por km** (un `Double`, porque sale de una división) y sale
+    // como `5'30"/km`. Es el número que el corredor mira primero, y el único de la app que
+    // no se lee en base 10: 5,5 minutos por km no es "5,5" sino "5'30"".
+
+    @Test(
+        "U-10 · El ritmo se muestra en minutos y segundos por km",
+        arguments: [
+            (330.0, "5'30\"/km"),
+            // Segundos justos: el `00` no se puede omitir (a diferencia de `restLabel`),
+            // porque un ritmo se lee siempre con los dos campos.
+            (300.0, "5'00\"/km"),
+            // Cero a la izquierda en los segundos: sin él, "6'5" se leería como seis y medio.
+            (365.0, "6'05\"/km"),
+            (240.0, "4'00\"/km"),
+            (272.0, "4'32\"/km"),
+        ]
+    )
+    func paceIsShownInMinutesAndSecondsPerKm(seconds: Double, expected: String) {
+        #expect(seconds.formattedPace == expected)
+    }
+
+    @Test(
+        "U-10 · Los segundos fraccionarios se redondean, no se truncan",
+        arguments: [
+            // El ritmo casi nunca es un entero: sale de dividir minutos por km. Redondear
+            // (y no truncar) evita que 5'29,6" se muestre como 5'29".
+            (330.4, "5'30\"/km"),
+            (330.6, "5'31\"/km"),
+            (329.5, "5'30\"/km"),
+        ]
+    )
+    func fractionalSecondsAreRounded(seconds: Double, expected: String) {
+        #expect(seconds.formattedPace == expected)
+    }
+
+    @Test("U-10 · Un ritmo de cero sale legible, y es alcanzable")
+    func aZeroPaceIsFormattedAndReachable() throws {
+        #expect(0.0.formattedPace == "0'00\"/km")
+
+        // Y no es un caso teórico. `WorkoutDay.paceSecondsPerKm` exige `km > 0` —así que no
+        // hay división por cero— pero **no exige que los minutos sean > 0**. Un día con km
+        // cargados y duración 0 da ritmo 0.
+        let db = TestDB()
+        let dia = makeDay(date(2026, 7, 1), type: .rodaje, title: "Rodaje", in: db.context)
+        dia.actualKm = 5
+        dia.durationMinutes = 0
+
+        let ritmo = try #require(dia.paceSecondsPerKm)
+        #expect(ritmo == 0)
+        #expect(ritmo.formattedPace == "0'00\"/km", "El detalle del día mostraría esto")
+
+        // Cómo se llega: el formulario de completar sí valida `minutes > 0` para el ritmo que
+        // calcula **en vivo**, pero el que se guarda no pasa por ahí. Una importación de
+        // HealthKit de una corrida de menos de un minuto también redondea la duración a 0.
+        // No rompe nada —"0'00"/km" se lee como un dato faltante— pero es un cero que miente
+        // menos que un guion.
+    }
+
+    @Test("U-10 · Sin km o sin duración no hay ritmo")
+    func noPaceWithoutDistanceOrDuration() {
+        let db = TestDB()
+
+        let sinKm = makeDay(date(2026, 7, 1), type: .rodaje, in: db.context)
+        sinKm.durationMinutes = 30
+        #expect(sinKm.paceSecondsPerKm == nil)
+
+        let sinDuracion = makeDay(date(2026, 7, 2), type: .rodaje, in: db.context)
+        sinDuracion.actualKm = 5
+        #expect(sinDuracion.paceSecondsPerKm == nil)
+
+        // El `km > 0` es lo que evita la división por cero: sin él, un día con 0 km y
+        // duración daría `inf`, y `Int(inf.rounded())` **crashea**.
+        let ceroKm = makeDay(date(2026, 7, 3), type: .rodaje, in: db.context)
+        ceroKm.actualKm = 0
+        ceroKm.durationMinutes = 30
+        #expect(ceroKm.paceSecondsPerKm == nil, "Sin este guard, `formattedPace` crashearía")
+    }
+
+    @Test("U-10 · Un ritmo muy lento no tiene tramo de horas")
+    func aVerySlowPaceHasNoHours() {
+        // Mismo límite que `countdownLabel` (U-07): más de 60 minutos por km se lee
+        // "61'40"/km" en vez de "1h01'40"". Alcanzable solo caminando muy despacio o con una
+        // duración mal cargada. Se lee igual, solo crece el ancho.
+        #expect(3700.0.formattedPace == "61'40\"/km")
+    }
 }
