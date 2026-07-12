@@ -453,4 +453,89 @@ struct WeeklyVolumeTests {
         // El guard que falta es una línea (`guard count > 0 else { return [] }`), y convertiría
         // un crash en el caso vacío que ya está testeado arriba.
     }
+
+    // MARK: - U-28
+
+    // La semana arranca el **lunes**, no el domingo. `PlanConstants.calendar` lo fija con
+    // `firstWeekday = 2` en vez de tomar el default del sistema (que en es-AR y en en-US es
+    // domingo).
+    //
+    // Parece un detalle de configuración y es el eje de todo el volumen semanal: si la semana
+    // arrancara el domingo, **el fondo largo del domingo se contaría en la semana siguiente**,
+    // separado de los rodajes que lo prepararon. Cada barra de la tarjeta quedaría corrida.
+
+    @Test("U-28 · El domingo pertenece a la semana que empezó el lunes anterior")
+    func sundayBelongsToThePrecedingMonday() throws {
+        let db = TestDB()
+
+        // La semana del lunes 15/6 al domingo 21/6. El fondo largo va el domingo.
+        makeDay(date(2026, 6, 15), type: .rodaje, title: "Rodaje 6 km",
+                isCompleted: true, actualKm: 6, in: db.context)
+        makeDay(date(2026, 6, 21), type: .fondo, title: "Fondo 14 km",
+                isCompleted: true, actualKm: 14, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Los 20 km caen juntos, en la misma semana. Con el domingo como primer día, el fondo
+        // se habría ido a la semana siguiente y esta habría mostrado solo 6.
+        #expect(WeeklyVolume.actualKm(for: date(2026, 6, 17), among: dias) == 20)
+
+        // Y el lunes siguiente ya es otra semana: no arrastra nada.
+        #expect(WeeklyVolume.actualKm(for: date(2026, 6, 22), among: dias) == 0)
+    }
+
+    @Test("U-28 · El lunes abre la semana; el domingo anterior es de la otra")
+    func mondayOpensTheWeek() throws {
+        let db = TestDB()
+
+        // Dos días consecutivos que caen en semanas distintas: domingo 14/6 y lunes 15/6.
+        // Es el borde exacto.
+        makeDay(date(2026, 6, 14), type: .fondo, title: "Fondo 12 km",
+                isCompleted: true, actualKm: 12, in: db.context)
+        makeDay(date(2026, 6, 15), type: .rodaje, title: "Rodaje 5 km",
+                isCompleted: true, actualKm: 5, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Un día de diferencia, y cada uno en su semana.
+        #expect(WeeklyVolume.actualKm(for: date(2026, 6, 14), among: dias) == 12)
+        #expect(WeeklyVolume.actualKm(for: date(2026, 6, 15), among: dias) == 5)
+    }
+
+    @Test("U-28 · Las barras de la tendencia empiezan todas un lunes")
+    func everyWeekStartsOnAMonday() {
+        let cal = PlanConstants.calendar
+        let semanas = WeeklyVolume.recentWeeks(6, days: [], exercises: [], today: miercoles)
+
+        // `weekStart` es lo que la tarjeta usa para rotular el eje. Si alguna arrancara un
+        // domingo, la etiqueta diría una fecha y la barra contaría otra cosa.
+        for semana in semanas {
+            // En el calendario gregoriano el domingo es 1 y el lunes es 2.
+            #expect(cal.component(.weekday, from: semana.weekStart) == 2)
+        }
+    }
+
+    @Test("U-28 · El lunes está fijado dos veces, y las dos hacen falta")
+    func thePlanCalendarPinsItsFirstWeekday() {
+        #expect(PlanConstants.calendar.firstWeekday == 2, "2 = lunes")
+
+        // `PlanConstants.calendar` hace **dos** cosas: fija el locale en es-AR y además pone
+        // `firstWeekday = 2` explícito. Resulta que la primera ya alcanzaría —el locale
+        // argentino arranca la semana el lunes por su cuenta:
+        var soloLocale = Calendar(identifier: .gregorian)
+        soloLocale.locale = Locale(identifier: "es_AR")
+        #expect(soloLocale.firstWeekday == 2, "es-AR ya arranca en lunes")
+
+        // …pero el `firstWeekday = 2` explícito **no es redundante**: es lo que sostiene el
+        // invariante si alguien toca el locale. Un calendario sin locale (o con uno
+        // anglosajón) arranca el **domingo**, y ahí todo el volumen semanal se correría un
+        // día — el fondo del domingo se iría a la semana siguiente, separado de los rodajes
+        // que lo prepararon.
+        var anglosajon = Calendar(identifier: .gregorian)
+        anglosajon.locale = Locale(identifier: "en_US")
+        #expect(anglosajon.firstWeekday == 1, "1 = domingo")
+
+        // O sea: la línea explícita es la que hace que el lunes sea una **decisión del plan**
+        // y no una consecuencia del idioma. Vale la pena tenerla.
+    }
 }

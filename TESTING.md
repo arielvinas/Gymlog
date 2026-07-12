@@ -339,7 +339,15 @@ ninguna red.
       Mismo tipo que los bugs 3/5/6 (agujero real, tapado por no ser pisado), pero **más grave**:
       los otros dejan estado inconsistente, este **cierra la app**. El guard que falta es una
       línea: `guard count > 0 else { return [] }`.
-- [ ] **U-28** La semana arranca el **lunes**. Test con un domingo y el lunes siguiente.
+- [x] **U-28** La semana arranca el **lunes**. ✅ El domingo pertenece a la semana que abrió el
+      lunes anterior — importa: si arrancara el domingo, **el fondo largo se contaría en la semana
+      siguiente**, separado de los rodajes que lo prepararon, y cada barra quedaría corrida.
+      Testeado el borde exacto (domingo 14 y lunes 15 caen en semanas distintas) y que las seis
+      barras de la tendencia empiecen todas un lunes.
+      Corrección a lo que yo suponía: **el locale es-AR ya arranca en lunes** por su cuenta, así
+      que el `firstWeekday = 2` de `PlanConstants` parecía redundante. No lo es: es lo que sostiene
+      el invariante **si alguien toca el locale** (en-US arranca el domingo). Hace que el lunes sea
+      una decisión del plan y no una consecuencia del idioma.
 - [ ] **U-29** Cruce de año (semana del 29/12 al 4/1).
 
 ### Racha (`StreakCalculator`)
