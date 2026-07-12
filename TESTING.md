@@ -306,7 +306,17 @@ ninguna red.
       No es un caso de borde: el cero es lo que ve la mayoría de las semanas. `reduce(0, +)` hace
       lo correcto sin caso especial — para una barra de volumen, "cero kilos" y "sin datos" son lo
       mismo.
-- [ ] **U-24** `actualKm` suma solo días completados. ⚠️ Asimétrico con `plannedKm`, que no filtra.
+- [x] **U-24** `actualKm` suma solo días completados. ✅ **La asimetría con `plannedKm` es
+      deliberada y correcta**, no un descuido: el planificado es el **objetivo** de la semana (si
+      bajara cuando un día queda sin hacer, no habría contra qué comparar) y el real es un
+      **hecho** (no puede adelantarse al usuario). El contraste "8 de 20" es la tarjeta entera, y
+      **depende** de que los dos usen criterios distintos.
+      Los tres números de la tarjeta, juntos: `plannedKm` → toda la semana · `actualKm` → solo
+      completados · `tonnage` → **todas las series, confirmadas o no**.
+      ⚠️ El que se salió de la fila es el tonelaje (**bug 15**): un rodaje sin confirmar **no**
+      cuenta, pero una serie sin confirmar **sí** — dos datos igual de provisorios, dos respuestas
+      opuestas, en la misma tarjeta. Filtrar `tonnage` por `isDone` alinearía las dos mitades y
+      mataría el bug 15.
 - [ ] **U-25** `recentWeeks(6)`: devuelve 6, de la más vieja a la más nueva, la última contiene
       `today`.
 - [ ] **U-26** `recentWeeks` sin datos → 6 semanas en cero (es el caso que dibuja la tarjeta vacía).

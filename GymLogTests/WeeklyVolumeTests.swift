@@ -161,4 +161,105 @@ struct WeeklyVolumeTests {
         #expect(WeeklyVolume.tonnage(for: date(2026, 6, 10), among: [a, b]) == 800)
         #expect(WeeklyVolume.tonnage(for: date(2026, 6, 24), among: [a, b]) == 900)
     }
+
+    // MARK: - U-24
+
+    // Los tres números de la tarjeta de volumen usan **tres criterios distintos** para decidir
+    // qué cuenta. No es evidente mirando la pantalla, y es lo que hace que "planificado" y
+    // "real" no sean comparables de la forma que uno esperaría:
+    //
+    //   plannedKm  → todos los días de la semana, completados o no  (es un objetivo)
+    //   actualKm   → solo los días **completados**                  (es un hecho)
+    //   tonnage    → todas las series, confirmadas o no             (⚠️ bug 15)
+    //
+    // Los dos primeros están bien y la asimetría entre ellos es **deliberada**. El tercero es
+    // el que se salió de la fila.
+
+    @Test("U-24 · Los km reales solo cuentan los días completados")
+    func actualKilometresOnlyCountCompletedDays() {
+        let db = TestDB()
+
+        // Un rodaje hecho: 8 km, marcado como completo.
+        makeDay(miercoles, type: .rodaje, title: "Rodaje 8 km",
+                isCompleted: true, actualKm: 8, in: db.context)
+
+        // Y otro con km cargados pero **sin marcar como completo**. Pasa de verdad: el
+        // usuario abre el formulario, escribe los kilómetros y se va sin confirmar. O la
+        // importación de HealthKit deja el dato antes de que él lo revise.
+        makeDay(date(2026, 6, 18), type: .rodaje, title: "Rodaje 10 km",
+                isCompleted: false, actualKm: 10, in: db.context)
+
+        let dias = try! db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Solo los 8. Es la decisión correcta: `actualKm` responde "cuánto corriste", y un
+        // día sin confirmar todavía no es un hecho. El número no puede adelantarse al usuario.
+        #expect(WeeklyVolume.actualKm(for: miercoles, among: dias) == 8)
+    }
+
+    @Test("U-24 · Los km planificados cuentan toda la semana, hecha o no")
+    func plannedKilometresCountTheWholeWeek() {
+        let db = TestDB()
+
+        makeDay(miercoles, type: .rodaje, title: "Rodaje 8 km",
+                isCompleted: true, actualKm: 8, in: db.context)
+        makeDay(date(2026, 6, 18), type: .rodaje, title: "Fondo 12 km",
+                isCompleted: false, in: db.context)
+
+        let dias = try! db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Los 20 km, aunque el fondo todavía no se haya corrido. Y **acá está bien**: los km
+        // planificados son el objetivo de la semana. Si el número bajara a medida que los
+        // días quedan sin hacer, dejaría de ser un objetivo y no habría contra qué comparar.
+        #expect(WeeklyVolume.plannedKm(for: miercoles, among: dias) == 20)
+        #expect(WeeklyVolume.actualKm(for: miercoles, among: dias) == 8)
+
+        // O sea: 8 de 20. Ese contraste —lo que hiciste contra lo que te tocaba— es
+        // exactamente lo que la tarjeta quiere mostrar, y depende de que los dos números
+        // usen criterios **distintos**. La asimetría es la función, no un descuido.
+    }
+
+    @Test("U-24 · Un día completado sin km no aporta nada")
+    func aCompletedDayWithoutKilometresAddsNothing() {
+        let db = TestDB()
+
+        // Un día de fuerza completado: `actualKm` es `nil`. El `compactMap` lo saltea.
+        makeDay(miercoles, type: .fuerza, title: "Fuerza A", isCompleted: true, in: db.context)
+        // Y un rodaje completado al que el usuario nunca le cargó los km.
+        makeDay(date(2026, 6, 18), type: .rodaje, title: "Rodaje 8 km",
+                isCompleted: true, in: db.context)
+
+        let dias = try! db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Cero km reales, pero **8 planificados**: el plan sabe lo que había que correr, el
+        // registro no sabe lo que se corrió. Es la diferencia entre las dos fuentes — una lee
+        // el texto del plan, la otra lee lo que el usuario cargó.
+        #expect(WeeklyVolume.actualKm(for: miercoles, among: dias) == 0)
+        #expect(WeeklyVolume.plannedKm(for: miercoles, among: dias) == 8)
+    }
+
+    @Test("U-24 · ⚠️ El tonelaje es el que rompe la simetría")
+    func tonnageIsTheOddOneOut() {
+        let db = TestDB()
+
+        // El mismo escenario, en las dos mitades de la tarjeta: algo hecho y algo no.
+        //
+        // Corriendo: un rodaje sin confirmar **no cuenta**.
+        makeDay(miercoles, type: .rodaje, title: "Rodaje 10 km",
+                isCompleted: false, actualKm: 10, in: db.context)
+
+        // En el gimnasio: una serie sin confirmar **sí cuenta** (bug 15, ver U-22).
+        let gimnasio = makeDay(miercoles, type: .fuerza, in: db.context)
+        let press = makeExercise("Press banca", on: gimnasio, order: 0,
+                                 sets: [(80, 10)], in: db.context)
+        press.orderedSets[0].isDone = false
+
+        let dias = try! db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        #expect(WeeklyVolume.actualKm(for: miercoles, among: dias) == 0, "El rodaje espera")
+        #expect(WeeklyVolume.tonnage(for: miercoles, among: [press]) == 800, "⚠️ La serie no")
+
+        // Dos datos igual de "sin confirmar", dos respuestas opuestas, en la misma tarjeta.
+        // Si el tonelaje filtrara por `isDone` —como los km filtran por `isCompleted`— las
+        // dos mitades contarían lo mismo y el bug 15 desaparecería.
+    }
 }
