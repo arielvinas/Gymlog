@@ -166,7 +166,11 @@ La función más pura del repo y la que más casos raros tiene.
 
 ### Formateo (`NumberFormatting`, `TimeFormatting`, `DateFormatting`)
 
-- [ ] **U-06** `Int.restLabel`: `45 → "45 s"`, `60 → "1 min"`, `90 → "1:30 min"`, `120 → "2 min"`.
+- [x] **U-06** `Int.restLabel`: `45 → "45 s"`, `60 → "1 min"`, `90 → "1:30 min"`, `120 → "2 min"`. ✅
+      La regla: no mostrar ceros que no aportan (un minuto justo no lleva `:00`), y el segundo con
+      cero a la izquierda (si no, `"1:5 min"` se leería como uno coma cinco).
+      Límite conocido, no bug: **no hay tramo de horas** — `3600 → "60 min"`. Irrelevante para un
+      descanso; importaría si se reusa la función para otra duración.
 - [ ] **U-07** `Int.countdownLabel`: `90 → "1:30"`, `5 → "0:05"`.
 - [ ] **U-08** ⚠️ Negativos: `(-30).restLabel` → `"-30 s"`, `(-5).countdownLabel` → `"0:-5"`.
       `restRemaining` es `Int` — fijar qué se espera.
