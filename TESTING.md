@@ -467,13 +467,26 @@ ninguna red.
       `PlanExportView` agrupan por `weekTitle` y ordenan por **fecha**; no hay un solo
       `SortDescriptor(\.weekOrder)` en el proyecto. Se escribe y no se lee. El día que alguien
       ordene por ese campo —que es el nombre que invita a hacerlo— hereda el problema sin saberlo.
-- [ ] **U-42** `ProgressReportBuilder.build` con `days` vacío → `periodStart = today`,
-      `completionRate = 0`, `avgPace = nil`, sin crash. (Es `static`, puro, con `today` inyectable
-      y `HealthSnapshot()` sirve de stub — el mejor test de integración de lógica pura del repo.)
-- [ ] **U-43** `ProgressReportBuilder`: una corrida con km pero **sin duración** cuenta en el total
-      de km pero **no** en el ritmo promedio. Y `avgPace` es ponderado por distancia.
-- [ ] **U-44** `ProgressReportBuilder`: `completionRate` con 0 días de entrenamiento → 0 (división
-      protegida).
+- [x] **U-42** `ProgressReportBuilder.build` con `days` vacío → `periodStart = today`,
+      `completionRate = 0`, `avgPace = nil` (no 0: *nada*), sin crash. El período va del **primer
+      día del plan** (ordenado por fecha, no por posición en el array) **hasta hoy**; los días
+      **futuros no entran** — si contaran, la adherencia arrancaría baja y subiría sola.
+- [x] **U-43** `ProgressReportBuilder`: una corrida con km pero **sin duración** cuenta en el total
+      de km pero **no** en el ritmo promedio (si contara, el ritmo sería uno que nunca corriste).
+      `avgPace` es **ponderado por distancia**, no el promedio de los ritmos: un fondo de 20 km no
+      pesa lo mismo que un rodaje de 4. Sin completar o sin km → no es corrida. La tabla del PDF
+      se corta en **10** corridas (el conteo total no). El tipo se lista solo si tiene días
+      planificados, en el orden del plan.
+      ⚠️ **Asimetría CONFIRMADA:** todo el reporte se calcula sobre `periodDays`, **menos
+      `improvements`**, que recibe los `exercises` enteros **sin filtrar por fecha**. Hoy no hace
+      daño, pero el reporte puede citar una mejora de **fuera del período**; si mañana se agrega un
+      selector de fechas ("reporte de mayo"), la sección de fuerza va a seguir mostrando lo último
+      que hiciste, no lo de mayo.
+- [x] **U-44** `ProgressReportBuilder`: `completionRate` con 0 días de entrenamiento → 0 (división
+      protegida; 0/0 sería `NaN`). Los **descansos nunca cuentan como entrenamiento**, ni siquiera
+      marcados como completados: el filtro `type != .descanso` es lo que salva la situación
+      descrita en U-40 —si el reporte contara por `isCompleted` a secas, un descanso tildado
+      inflaría la adherencia—.
 
 ---
 
