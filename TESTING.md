@@ -779,8 +779,18 @@ app inusable.
       elegido **es el que sigue**.
       *Cambio de producción:* el botón de la barra era un **ícono mudo** (`arrow.triangle.swap` sin
       etiqueta) — invisible para VoiceOver *y* para el test. Se le puso `.accessibilityLabel`.
-- [ ] **E2E-06** Marcar un suplemento y verlo reflejado en Progreso.
-- [ ] **E2E-07** Crear, editar y borrar un día en la tab Plan.
+- [x] **E2E-06** Marcar un suplemento: la tarjeta refleja la marca (ida y vuelta contra la base) y
+      **se puede desmarcar**; Progreso muestra su sección de suplementos.
+      ⚠️ **No se afirma el número de adherencia, a propósito.** La tab Detalle abre en "hoy si está
+      en el plan; si no, el día más cercano", y el plan termina el **5/7/2026**: hoy (11/7) muestra
+      el 5/7, así que la marca se registra **en ese día**. Un `#expect` de "adherencia 7d = 1/7"
+      andaría hoy y **se rompería solo** la semana que viene, cuando el 5/7 se caiga de la ventana.
+      Un test que se rompe con el calendario y no con el código es peor que no tenerlo.
+- [x] **E2E-07** Crear, editar y borrar un día en la tab Plan (el ciclo entero contra la base).
+      ⚠️ La edición cambia el **detalle**, que arranca vacío, en vez de reescribir el título:
+      limpiar un campo en XCUITest pide el menú de *"Select All"*, que depende del **idioma del
+      simulador** y de un long-press que a veces no engancha. Frágil por razones que no tienen nada
+      que ver con lo que se está probando.
 - [ ] **E2E-08** Completar una corrida (km + minutos) y ver el ritmo calculado.
 - [ ] **E2E-09** Generar el reporte PDF → aparece la hoja de compartir.
 - [ ] **E2E-10** Exportar el plan a PDF → aparece la hoja de compartir.
