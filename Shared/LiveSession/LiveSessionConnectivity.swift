@@ -38,7 +38,9 @@ final class LiveSessionConnectivity: NSObject {
     /// Llamado al recibir un comando (lado reloj: lo aplica al engine).
     var onCommand: ((LiveSessionCommand) -> Void)?
 
-    private override init() { super.init() }
+    /// La app usa siempre `shared`. El `init` no es privado para que los tests puedan crear
+    /// instancias **aisladas** en vez de mutar el singleton (que corren en paralelo y se pisarían).
+    override init() { super.init() }
 
     /// Activa la sesión de WatchConnectivity. Idempotente.
     func activate() {
@@ -103,15 +105,28 @@ final class LiveSessionConnectivity: NSObject {
 
     // MARK: - Recibir
 
+    /// ¿Vale la pena quedarse con `nuevo`, teniendo `actual`?
+    ///
+    /// El canal entrega **desordenado**: un `sendMessage` de baja latencia puede llegar después de
+    /// un `transferUserInfo` que salió antes, y el `applicationContext` se reentrega al reabrir la
+    /// app. Sin esta regla, el espejo del iPhone retrocedería a un estado viejo.
+    ///
+    /// Solo se descarta lo viejo **de la misma sesión**: un `sessionID` distinto es una sesión
+    /// nueva, y sus tiempos no son comparables con los de la anterior.
+    ///
+    /// Es lógica pura, separada del transporte, para poder testearla sin `WCSession`.
+    static func shouldAccept(
+        _ nuevo: LiveSessionSnapshot,
+        over actual: LiveSessionSnapshot?
+    ) -> Bool {
+        guard let actual, actual.sessionID == nuevo.sessionID else { return true }
+        return nuevo.updatedAt > actual.updatedAt
+    }
+
     /// Procesa un diccionario recibido (venga por mensaje, userInfo o contexto).
-    private func handle(_ dict: [String: Any]) {
-        if let snapshot = LiveSessionWire.snapshot(from: dict) {
-            // Descarta snapshots iguales o más viejos de la misma sesión.
-            if let current = latestSnapshot,
-               current.sessionID == snapshot.sessionID,
-               snapshot.updatedAt <= current.updatedAt {
-                return
-            }
+    func handle(_ dict: [String: Any]) {
+        if let snapshot = LiveSessionWire.snapshot(from: dict),
+           Self.shouldAccept(snapshot, over: latestSnapshot) {
             latestSnapshot = snapshot
             onSnapshot?(snapshot)
         }

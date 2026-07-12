@@ -141,11 +141,10 @@ quedan como **checklist manual** antes de cada release:
       determinista. Inyectar un `var clock: () -> Date = Date.init` los deja mucho más legibles.
       Hacerlo cuando los tests del engine ya estén verdes, no antes.
 
-- [ ] **P0-7 · `LiveSessionConnectivity.handle(_:)` es `private`**
-      (`Shared/LiveSession/LiveSessionConnectivity.swift:107`). Adentro vive la regla de descarte
-      de snapshots viejos, que es lógica pura y crítica para la sync reloj↔iPhone. Extraerla a
-      `static func shouldAccept(_ new: LiveSessionSnapshot, over current: LiveSessionSnapshot?) -> Bool`.
-      Es el refactor más barato del repo. **Bloquea I-37..I-39.**
+- [x] **P0-7 · Regla de descarte extraída.** ✅ Hecho. `LiveSessionConnectivity.shouldAccept(_:over:)`
+      es ahora una `static func` pura, separada del transporte, y `handle(_:)` dejó de ser `private`.
+      El `init` tampoco es privado: los tests crean **instancias aisladas** en vez de mutar el
+      singleton (que corren en paralelo y se pisarían). La app sigue usando `shared`.
 
 Los protocolos para HealthKit, UNUserNotificationCenter, WCSession y HKWorkoutSession
 (`HealthManager`, `NotificationManager`, `LiveActivityController`, `WatchWorkoutManager` — todos
@@ -731,9 +730,13 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
 
 ### Conectividad *(requiere P0-7)*
 
-- [ ] **I-33** `shouldAccept` descarta un snapshot con `updatedAt` menor o igual al actual del mismo
-      `sessionID`, y acepta uno de otro `sessionID`.
-- [ ] **I-34** `handle(_:)` dispara `onSnapshot` / `onCommand` según el payload.
+- [x] **I-33** `shouldAccept` descarta un snapshot con `updatedAt` **menor o igual** al actual del
+      mismo `sessionID` (la comparación es `>` estricto: es lo que hace **idempotente** la reentrega
+      del `applicationContext` al reabrir la app), y **acepta uno de otro `sessionID` aunque sea más
+      viejo** — deliberado: los tiempos de dos sesiones distintas no son comparables, y si el reloj
+      reinicia y arranca una sesión nueva, el iPhone tiene que seguirla.
+- [x] **I-34** `handle(_:)` dispara `onSnapshot` / `onCommand` según el payload; un snapshot
+      descartado **no avisa ni pisa el estado**; un diccionario desconocido no hace nada.
 - [ ] **I-35** Política de entrega: reachable → `sendMessage`; no reachable → `transferUserInfo`;
       los snapshots además siempre van por `updateApplicationContext`, los comandos no. *(Requiere
       protocolizar `WCSession` — opcional, se puede diferir.)*
