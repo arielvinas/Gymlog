@@ -35,7 +35,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 4 | **Ráfaga de alertas al volver de background.** ✅ **CONFIRMADO** en I-07: vuelve con 35 s de tiempo extra → **4 vibraciones en <1 s**. Alcanzable a diario (el reloj apaga la pantalla y deja de tickear). **Pendiente de arreglar.** | I-07 ✅ |
 | 5 | ~~**`skipRest()` no valida la fase**~~ → **confirmado pero NO alcanzable** (I-11). En `.logging` saltea una serie; en la última, **deja la sesión en un callejón sin salida**; en `.done`, lo deshace. Lo tapan las UIs (el botón vive en la vista de descanso) y la guarda de `apply(_:)`. | I-11 ✅ |
 | 6 | ~~**`bringExerciseNext` no valida que el ejercicio pertenezca al día**~~ → **confirmado pero NO alcanzable** (I-14). Peor de lo anotado: no "reordena para nada" — le **reescribe el `order` al ejercicio ajeno**, dejando **dos ejercicios con el mismo `order` en el otro día**. Como `sorted` no es estable, ese día queda con orden indefinido. Lo contiene `switchableExercises`, que solo ofrece ejercicios del día. | I-14 ✅ |
-| 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series **se borra** al deduplicar. ✅ **CONFIRMADO y alcanzable** (I-28): un día con esfuerzo percibido + calorías del reloj vale **0**, y **una nota de una sola letra le gana**. Peor aún: hace que dos días **no** equivalentes empaten, y ahí el desempate por ID (I-25) sortea sobre datos reales. **Fix:** sumarlos a `richness()` — es aditivo, no rompe ningún desempate que hoy ande. | I-28 ✅ |
+| 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series **se borra** al deduplicar. ✅ **CONFIRMADO y alcanzable** (I-28): un día con esfuerzo percibido + calorías del reloj vale **0**, y **una nota de una sola letra le gana**. Peor aún: hace que dos días **no** equivalentes empaten, y ahí el desempate por ID (I-25) sortea sobre datos reales. **Fix:** sumarlos a `richness()` — es aditivo, no rompe ningún desempate que hoy ande. **Alcance más grave (I-27):** `cleanupKneeRecoveryIfNeeded` usa el mismo `richness == 0` para borrar días **sin necesidad de duplicado**. Un día de la rehabilitación con solo esfuerzo percibido o con las series tildadas se borra **directo**. ⚠️ **Esa limpieza ya corrió en el dispositivo real** (commit `11438f6`), y el tramo 24/6→5/7/2026 ya pasó: conviene revisar si se perdió algo. | I-28 ✅, I-27 ✅ |
 | 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`. | I-34 |
 | 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
 | 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. ✅ **CONFIRMADO y alcanzable** (I-21): el test corre cinco arranques seguidos y el estado no se mueve. No se sale solo. **Fix:** marcar la versión también cuando sale por el guard de `count == 0` — si ya hay días, el plan de esa versión *está* ahí. | I-21 ✅ |
@@ -675,8 +675,18 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       completa. Hoy no lo es.
 - [x] **I-26** El borrado arrastra en cascada `Exercise` y `ExerciseSet`: no quedan huérfanos
       (verificado con `fetchCount` antes y después).
-- [ ] **I-27** `cleanupKneeRecoveryIfNeeded` borra los días vacíos del rango 24/6→5/7 y **preserva**
-      los que tienen datos, incluida la carrera del 5/7.
+- [x] **I-27** `cleanupKneeRecoveryIfNeeded` borra los días vacíos del rango 24/6→5/7 y **preserva**
+      los que tienen datos, incluida la carrera del 5/7. No toca nada fuera del tramo (verificado en
+      los dos bordes: 23/6 y 6/7) y el tramo está **clavado a 2026** (un 24/6/2027 no le importa).
+      Corre una sola vez: marca el flag, y con el flag puesto no borra nada —así que un día que
+      agregues **después** de la limpieza es tuyo y no se lo lleva—.
+      ⚠️ **El bug 7 se cuela acá, y hace más daño que en la deduplicación.** La limpieza decide con
+      el mismo `richness(day) == 0`. En `deduplicateDays` el bug necesita un **duplicado** para
+      hacer daño; acá **no necesita nada**: si el día del tramo solo tiene `perceivedEffort`,
+      `activeCalories` o series **tildadas sin peso**, `richness` da 0 y el día **se borra
+      directo**. Y es justo lo que uno registra durante una rehabilitación, cuando no hay carga ni
+      distancia que anotar. El límite quedó medido: **tildar las tres series no salva el día;
+      anotar un solo peso, sí.**
 - [x] **I-28** ⚠️ **Bug 7 CONFIRMADO y alcanzable.** `richness()` puntúa `isCompleted` (1000),
       `actualKm` (200), `durationMinutes` (50), `avgHeartRate` (20), `notes` (10) y las series con
       reps o peso. **No mira `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`.**
