@@ -282,8 +282,16 @@ ninguna red.
       otra vez, hay que rehacerlo **relativo a una fecha objetivo**. Va con la deuda de HANDOFF
       ("el plan se quedó sin días" el 5/7/2026).
       Bordes exactos: 14/6 no, 15/6 sí, 21/6 sí, 22/6 no, 28/6 no, 29/6 sí, 5/7 sí, 6/7 no.
-- [ ] **U-21** `tracksWeight`: los de peso corporal / banda / core / salto → `false`. Los
-      desconocidos → `true`. Es **case-sensitive y exacto**.
+- [x] **U-21** `tracksWeight`: los 12 de peso corporal / banda / core / equilibrio / salto →
+      `false`. Los desconocidos (los que agrega el usuario a mano) → `true`, que es la apuesta
+      correcta: un campo de kilos de más se ignora; al revés, no tendría dónde anotar la carga. ✅
+      La lista **se deriva de las plantillas** (`dayA + dayB` con `weighted: false`), así que no hay
+      una segunda lista que mantener sincronizada — y es lo que hoy hace inofensiva la mina de U-19.
+      ⚠️ **El match es exacto** (`Set<String>.contains`, sin trim ni case-insensitive):
+      `"puente lateral"`, `"Puente lateral "` o `"Puente Lateral"` pasan a **"con peso"**.
+      Alcanzable renombrando un ejercicio. Misma raíz que el bug 1: **se deduce del texto lo que
+      debería ser un dato** — `ExerciseTemplate.weighted` existe, pero no se persiste en el
+      `Exercise`, así que hay que reconstruirlo por nombre.
 
 ### Volumen (`Maraton/Models/WeeklyVolume.swift`)
 

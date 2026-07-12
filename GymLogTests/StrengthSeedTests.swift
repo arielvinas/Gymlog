@@ -338,4 +338,96 @@ struct StrengthSeedTests {
         #expect(!rutina.contains { $0.name.contains("Flexión de rodillas") }, "El taper sacó la flexión")
         #expect(rutina.allSatisfy { $0.sets <= 2 }, "Y las series están partidas al medio")
     }
+
+    // MARK: - U-21
+
+    // `tracksWeight` decide si la serie muestra el campo de kilos. Es lo que evita que la app
+    // te pida cuántos kilos levantaste en una plancha. Y —como salió en U-19— es la red que
+    // hoy tapa el `weighted` perdido del taper, porque resuelve **por nombre** contra una
+    // lista estática, no contra el template que se está sembrando.
+
+    @Test(
+        "U-21 · Peso corporal, banda, core, equilibrio y salto no llevan peso",
+        arguments: [
+            "Abdominales bisagra a dos piernas",
+            "Bicho muerto (dead bug)",
+            "Nados",
+            "Desplazamiento lateral con banda",
+            "Estocada + flexión de cadera",
+            "Salto de paracaidista",
+            "Fondos de tríceps en banco",
+            "Abdominal cruzado",
+            "Abdominales bicicleta",
+            "Puente lateral",
+            "Equilibrio a un pie sobre bosu",
+            "Salto sobre step a una pierna",
+        ]
+    )
+    func bodyweightExercisesDoNotTrackWeight(nombre: String) {
+        #expect(StrengthSeed.tracksWeight(exerciseName: nombre) == false)
+    }
+
+    @Test(
+        "U-21 · Los ejercicios con carga sí",
+        arguments: [
+            "Empuje de hombros con barra (parado)",
+            "Aductores en máquina",
+            "Extensión de rodillas en máquina",
+            "Remo con mancuerna a un brazo",
+            "Bíceps con barra toma supina",
+        ]
+    )
+    func loadedExercisesTrackWeight(nombre: String) {
+        #expect(StrengthSeed.tracksWeight(exerciseName: nombre))
+    }
+
+    @Test("U-21 · Un ejercicio desconocido se asume con peso")
+    func unknownExercisesAssumeWeight() {
+        // Los que el usuario agrega a mano (`GymSessionView` tiene "Agregar ejercicio") no
+        // están en ninguna lista. El default es **con peso**, que es la apuesta correcta: si
+        // se equivoca, el usuario ve un campo de kilos de más y lo ignora. Al revés —asumir
+        // peso corporal— le escondería el campo y no tendría dónde anotar la carga.
+        #expect(StrengthSeed.tracksWeight(exerciseName: "Press militar"))
+        #expect(StrengthSeed.tracksWeight(exerciseName: "Cualquier cosa"))
+        #expect(StrengthSeed.tracksWeight(exerciseName: ""), "Hasta el vacío")
+    }
+
+    @Test("U-21 · ⚠️ El match es exacto: una letra de más y pide kilos")
+    func theMatchIsExactAndUnforgiving() {
+        // `tracksWeight` es `!bodyweightExerciseNames.contains(name)`: un `Set<String>` y una
+        // comparación exacta. No hay `trimming`, ni case-insensitive, ni tolerancia.
+        #expect(StrengthSeed.tracksWeight(exerciseName: "Puente lateral") == false)
+
+        // ⚠️ Cualquier variación rompe el match y el ejercicio pasa a "con peso":
+        #expect(StrengthSeed.tracksWeight(exerciseName: "puente lateral"), "Minúscula inicial")
+        #expect(StrengthSeed.tracksWeight(exerciseName: "Puente lateral "), "Un espacio al final")
+        #expect(StrengthSeed.tracksWeight(exerciseName: "Puente Lateral"), "Otra capitalización")
+
+        // Es alcanzable: el usuario puede **renombrar** un ejercicio. Si le saca el acento a
+        // "Bicho muerto (dead bug)" o le corrige algo, la app empieza a pedirle kilos para un
+        // ejercicio de core. No es grave —un campo de más— pero es ruido, y la causa es
+        // invisible desde la UI.
+        //
+        // La raíz es la misma que la del bug 1 (U-18): **la app deduce del texto lo que
+        // debería ser un dato**. Acá el dato existe (`ExerciseTemplate.weighted`) pero no se
+        // persiste en el `Exercise`, así que hay que reconstruirlo por nombre.
+    }
+
+    @Test("U-21 · La lista sale de las plantillas, no de una constante aparte")
+    func theListIsDerivedFromTheTemplates() {
+        // `bodyweightExerciseNames` se computa como los nombres de `dayA + dayB` con
+        // `weighted: false`. O sea que **no hay una segunda lista que mantener sincronizada**:
+        // agregar un ejercicio de core a una rutina lo suma solo.
+        //
+        // Es lo que hace que la mina de U-19 (el taper que pierde el flag) sea inofensiva
+        // hoy: la lista se arma de los originales, no de las copias.
+        let esperados = Set(
+            (StrengthSeed.dayA + StrengthSeed.dayB).filter { !$0.weighted }.map(\.name)
+        )
+        #expect(esperados.count == 12)
+
+        for nombre in esperados {
+            #expect(StrengthSeed.tracksWeight(exerciseName: nombre) == false)
+        }
+    }
 }
