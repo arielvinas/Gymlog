@@ -854,6 +854,23 @@ El nombre del simulador **no se hardcodea**: se elige el primer iPhone disponibl
 imágenes cambian el catálogo de dispositivos entre versiones, y un `iPhone 17 Pro` que hoy existe
 puede no existir el mes que viene.
 
+⚠️ **Mac Catalyst necesita un destino `generic/`.** Con `platform=macOS,variant=Mac Catalyst` a
+secas, xcodebuild lo resuelve a **"My Mac"** —la Mac del runner— y falla:
+
+```
+Ineligible destinations: { platform:macOS, variant:Mac Catalyst, name:My Mac,
+  error: Xcode doesn't support My Mac's macOS 26.4 }
+```
+
+El runner corre **macOS 26.4** y **Xcode 26.6 exige 26.5** para usar la Mac como destino. Es la
+**única** combinación que se rompe: los builds de simulador no dependen de la Mac real, así que iOS
+y watchOS pasan y solo Catalyst falla — lo que hace que parezca un problema de Catalyst y no del
+runner. Con `generic/platform=macOS,variant=Mac Catalyst` ("Any Mac") se **compila** para la
+arquitectura sin necesitar una Mac que pueda **ejecutarlo**, que es justo lo que el job necesita.
+
+*(No es firma: se descartó reproduciendo en local con DerivedData limpio y sin `DEVELOPMENT_TEAM`.
+Las dos compilaban.)*
+
 ### Lo que está armado
 
 | Archivo | Qué hace |
