@@ -110,4 +110,70 @@ struct TimeFormattingTests {
         #expect(3600.countdownLabel == "60:00")
         #expect(3665.countdownLabel == "61:05")
     }
+
+    // MARK: - U-08
+
+    // ⚠️ Ninguna de las dos funciones valida el signo. Los tests de abajo **documentan** qué
+    // sale con un negativo; no lo aprueban. Lo que las salva es que el engine nunca les
+    // manda uno — y eso también está testeado acá, porque es la única razón por la que esto
+    // no se ve en pantalla.
+
+    @Test("U-08 · ⚠️ Un descanso negativo se formatea como si nada")
+    func negativeRestLabelIsNotValidated() {
+        // `restLabel` compara `self < 60`, y un negativo también lo cumple: sale por la rama
+        // de segundos. Al menos es legible.
+        #expect((-30).restLabel == "-30 s")
+        #expect((-1).restLabel == "-1 s")
+    }
+
+    @Test("U-08 · ⚠️ Una cuenta regresiva negativa sale rota")
+    func negativeCountdownLabelIsBroken() {
+        // Acá es peor. `String(format: "%d:%02d", self / 60, self % 60)` con un negativo:
+        // Swift trunca la división hacia cero y el resto se lleva el signo, así que los dos
+        // componentes salen negativos y el `%02d` no puede rellenar nada.
+        #expect((-5).countdownLabel == "0:-5")
+        #expect((-90).countdownLabel == "-1:-30")
+
+        // "0:-5" en el número grande del descanso sería difícil de explicar. Y no hay un
+        // `max(0,)` adentro que lo impida: la protección está toda del lado del que llama.
+    }
+
+    @Test("U-08 · El engine nunca les manda un negativo")
+    func theEngineNeverEmitsANegative() throws {
+        let db = TestDB()
+        let day = makeDay(date(2026, 7, 1), type: .fuerza, in: db.context)
+        makeExercise("Press banca", on: day, order: 0, targetReps: "8", restSeconds: 30,
+                     sets: [(nil, nil), (nil, nil)], in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.completeCurrent()
+        let fin = try #require(engine.restEndDate)
+
+        // Esta es la razón por la que U-08 no es un bug visible. Los tres valores que llegan
+        // a estas funciones están recortados en origen:
+        //
+        // 1. `restRemaining` toca fondo en 0, no sigue de largo.
+        engine.tickRest(now: fin.addingTimeInterval(45))
+        #expect(engine.restRemaining == 0)
+        #expect(engine.restRemaining.countdownLabel == "0:00")
+
+        // 2. `restOvertime` cuenta hacia arriba: nace en 0 y crece.
+        #expect(engine.restOvertime == 45)
+
+        // 3. `restTotal` no baja de 15 aunque le restes de más (ver I-08). Con un descanso de
+        //    30 s, tres toques de −15 lo dejarían en −15 si no hubiera clamp.
+        engine.adjustRest(by: -15)
+        engine.adjustRest(by: -15)
+        engine.adjustRest(by: -15)
+        #expect(engine.restTotal == 15)
+        #expect(engine.restTotal.restLabel == "15 s")
+
+        // Y el espejo del iPhone, que calcula el tiempo extra por su cuenta a partir de la
+        // fecha de fin, también hace `max(0, …)` antes de formatear.
+        //
+        // O sea: cuatro clamps en cuatro lugares distintos. Funciona, pero la garantía vive
+        // en los que llaman, no en la función. Un call site nuevo que se olvide del clamp
+        // pinta "0:-5" en la muñeca.
+    }
 }

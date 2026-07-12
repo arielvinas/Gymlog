@@ -177,7 +177,14 @@ La función más pura del repo y la que más casos raros tiene.
       fija porque es un número que cambia cada segundo: si alternara de forma, saltaría de ancho.
       Acá el **no tener tramo de horas sí es alcanzable** —el tiempo extra no tiene techo (I-05)—
       pero solo crece el ancho del texto: `3600 → "60:00"`.
-- [ ] **U-08** ⚠️ Negativos: `(-30).restLabel` → `"-30 s"`, `(-5).countdownLabel` → `"0:-5"`.
+- [x] **U-08** ⚠️ Negativos: `(-30).restLabel` → `"-30 s"` (legible), `(-5).countdownLabel` →
+      **`"0:-5"`** y `(-90)` → **`"-1:-30"`** (roto: Swift trunca hacia cero y el resto se lleva el
+      signo, así que el `%02d` no rellena nada). ✅ **No alcanzable**: los cuatro valores que
+      llegan a estas funciones están recortados **en origen** — `restRemaining` toca fondo en 0,
+      `restOvertime` nace en 0 y crece, `restTotal` no baja de 15 (I-08), y el espejo hace
+      `max(0, …)` sobre el tiempo extra que calcula solo.
+      ⚠️ **La garantía vive en los cuatro que llaman, no en la función.** Un call site nuevo que se
+      olvide del clamp pinta `"0:-5"` en la muñeca.
       `restRemaining` es `Int` — fijar qué se espera.
 - [ ] **U-09** `Double.formattedKm` / `.formattedKg`: separador decimal coma (es-AR), cero,
       y `1000.0 → "1.000"` (separador de miles — relevante para el tonelaje).
