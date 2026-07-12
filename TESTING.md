@@ -456,8 +456,17 @@ ninguna red.
       una nota como "Caminata suave" en un descanso queda **invisible** en la tarjeta de hoy.
       `DailyPlanInfo.workout` busca por día de calendario (da igual la hora); con **duplicados
       devuelve el primero del array** —arbitrario, no "el más completo"—.
-- [ ] **U-41** `WeekAssigner.weekInfo`: hereda el título si hay un día de esa semana; si no, crea
-      `"Semana del …"` con `order = max + 1`. Con `days` vacío → `order = 1`.
+- [x] **U-41** `WeekAssigner.weekInfo`: hereda título/etiqueta/orden si hay un día en la misma
+      semana calendario (que **empieza el lunes**: el domingo todavía pertenece a la anterior); si
+      no, crea `"Semana del <lunes>"` con `tag = nil` y `order = max + 1`. Con `days` vacío →
+      `order = 1`. No confunde la misma semana de años distintos.
+      ⚠️ Hereda del **primer día del array**, no del más antiguo: si la semana ya está partida en
+      dos títulos (bug 2), a cuál se suma el día nuevo es **arbitrario**.
+      ⚠️ **`weekOrder` está vestigial.** Una semana anterior a todas igual se lleva el orden más
+      alto (`max + 1`), pero **hoy no se nota porque nadie ordena por `weekOrder`**: `PlanView` y
+      `PlanExportView` agrupan por `weekTitle` y ordenan por **fecha**; no hay un solo
+      `SortDescriptor(\.weekOrder)` en el proyecto. Se escribe y no se lee. El día que alguien
+      ordene por ese campo —que es el nombre que invita a hacerlo— hereda el problema sin saberlo.
 - [ ] **U-42** `ProgressReportBuilder.build` con `days` vacío → `periodStart = today`,
       `completionRate = 0`, `avgPace = nil`, sin crash. (Es `static`, puro, con `today` inyectable
       y `HealthSnapshot()` sirve de stub — el mejor test de integración de lógica pura del repo.)
