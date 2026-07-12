@@ -186,8 +186,14 @@ La función más pura del repo y la que más casos raros tiene.
       ⚠️ **La garantía vive en los cuatro que llaman, no en la función.** Un call site nuevo que se
       olvide del clamp pinta `"0:-5"` en la muñeca.
       `restRemaining` es `Int` — fijar qué se espera.
-- [ ] **U-09** `Double.formattedKm` / `.formattedKg`: separador decimal coma (es-AR), cero,
-      y `1000.0 → "1.000"` (separador de miles — relevante para el tonelaje).
+- [x] **U-09** `Double.formattedKm` / `.formattedKg`: coma decimal, un decimal, sin `,0` colgando,
+      cero y negativos. ✅ `formattedKg` **es** `formattedKm` (cambiar uno cambia el otro).
+      Dos cosas no obvias: los **miles se separan con punto** (`3.200 kg` — pasa siempre en el
+      resumen de una sesión de fuerza), y ese `"1.000"` **no vuelve a entrar** por
+      `PlannedDistance.parse`, que lo leería como `1,0` (U-05): formatear y re-parsear no es una
+      ida y vuelta segura. Hoy ninguna ruta lo hace.
+      El locale está **fijado a `es_AR`** a mano: un teléfono en inglés igual ve `12,5`. Decisión,
+      no bug.
 - [ ] **U-10** `Double.formattedPace`: `330 → "5'30\"/km"`; redondeo; cero.
 - [ ] **U-11** `Date.dayMonth` / `.weekdayAndDay` / `.longDate` en es-AR. Comparar contra un
       `DateFormatter` construido en el test, **no** contra strings literales: las abreviaturas de
