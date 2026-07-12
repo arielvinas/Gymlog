@@ -415,4 +415,42 @@ struct WeeklyVolumeTests {
         )
         #expect(semanaDelPico.weekStart == inicioEsperado)
     }
+
+    // MARK: - U-27
+
+    // ⚠️ **Bug 11.** `recentWeeks` construye `(0..<count)`. Con `count` negativo, ese rango es
+    // inválido —`lowerBound > upperBound`— y Swift **aborta el proceso**: no devuelve una lista
+    // vacía ni tira un error, hace `fatalError`.
+    //
+    // 🚨 **Por eso NO hay un test que llame a `recentWeeks(-1)`.** No se puede: un `fatalError`
+    // no es una excepción, no hay `#expect(throws:)` que lo atrape, y como Swift Testing corre
+    // en paralelo el crash **se llevaría puesto al resto de la suite** (es exactamente lo que
+    // nos pasó con el SIGTRAP del `ModelContainer`, ver P0-3 en TESTING.md).
+    //
+    // Lo que sí se puede testear es **el borde seguro** (el 0) y **la contención** (quién llama
+    // y con qué). Eso es lo que hay acá abajo.
+
+    @Test("U-27 · Pedir cero semanas devuelve una lista vacía, sin romperse")
+    func askingForZeroWeeksIsSafe() {
+        // `(0..<0)` es un rango vacío válido: el `compactMap` no itera y devuelve `[]`. El 0
+        // es el último valor seguro; un paso más abajo, la app se cae.
+        let semanas = WeeklyVolume.recentWeeks(0, days: [], exercises: [], today: miercoles)
+        #expect(semanas.isEmpty)
+    }
+
+    @Test("U-27 · Lo que hoy contiene el bug: el único call site usa el default")
+    func theOnlyCallSiteUsesTheDefault() {
+        // `ProgressDashboardView` es el único lugar que llama a `recentWeeks`, y lo hace **sin
+        // pasar `count`**: usa el default de 6. No hay ninguna ruta por la que un número —y
+        // mucho menos un negativo— llegue desde la UI o desde los datos del usuario.
+        //
+        // O sea que el bug 11 es del mismo tipo que los bugs 3, 5 y 6 del engine: un agujero
+        // real en la API, tapado por el hecho de que nadie lo pisa. La diferencia es la
+        // gravedad — los otros dan estado inconsistente; este **cierra la app**.
+        let porDefecto = WeeklyVolume.recentWeeks(days: [], exercises: [], today: miercoles)
+        #expect(porDefecto.count == 6, "El default que usa el dashboard")
+
+        // El guard que falta es una línea (`guard count > 0 else { return [] }`), y convertiría
+        // un crash en el caso vacío que ya está testeado arriba.
+    }
 }

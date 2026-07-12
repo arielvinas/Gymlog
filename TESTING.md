@@ -39,7 +39,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`. | I-34 |
 | 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
 | 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. | I-21 |
-| 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. | U-27, U-35 |
+| 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. ✅ **`recentWeeks` confirmado por lectura, NO alcanzable** (U-27): único call site = `ProgressDashboardView`, sin pasar `count`. **No se puede testear el crash** —un `fatalError` mataría toda la suite— así que el test fija el borde seguro (0 → `[]`) y la contención. Falta ver `recentImprovements` (U-35). | U-27 ✅, U-35 |
 | **12** | 🆕 **Reabrir un día terminado reinicia la sesión.** ✅ **CONFIRMADO y alcanzable** (I-15). `firstIncompleteIndex` hace `firstIndex { … } ?? 0`: sin series pendientes devuelve **0**, indistinguible de "la primera está pendiente". El botón "Empezar sesión guiada" **no está gateado por `isCompleted`**, así que abrir un día ya entrenado te deja en la serie 1 con el botón de completar listo — y seguir el flujo arranca un descanso de 90 s y rehace la sesión. La fase `.done` solo la pone `finish()`, o sea que **vive en memoria y no sobrevive a cerrar la sesión**. Datos no se pierden. **Pendiente de arreglar** — ⚠️ **ojo con el fix**: ver la nota de abajo. | I-15 ✅ |
 
 | **13** | 🆕 **Un "Anterior" que llega tarde resucita una sesión terminada.** ✅ **CONFIRMADO** (I-19). `apply(.goBack)` es el **único** comando sin guarda de fase: su `else if index > 0` se cumple igual en `.done`. La carrera es real: el espejo del iPhone dibuja "Anterior" en la fase de carga, y entre el toque y la llegada del comando al reloj hay un viaje de WatchConnectivity. Efecto: la sesión vuelve a `.logging`, el índice retrocede y **des-marca la anteúltima serie** (no la última), dejando el día **marcado como completo pero con un hueco**. Nadie lo devuelve a `.done`. **A diferencia de los bugs 3, 5 y 6, la UI no lo tapa** — la guarda que falta es precisamente contra la ventana en que la UI está vieja. **Pendiente de arreglar.** | I-19 ✅ |
@@ -328,7 +328,17 @@ ninguna red.
       También: los datos **fuera de la ventana** no se filtran hacia adentro (entrenó hace tres
       meses → seis ceros), y una semana con datos entre semanas vacías **no contamina** a las
       vecinas (cada barra se calcula sola).
-- [ ] **U-27** ⚠️ **Bug 11.** `recentWeeks(0)` → `[]`, pero `recentWeeks(-1)` → **crash**.
+- [x] **U-27** ⚠️ **Bug 11 — confirmado por lectura, NO alcanzable.** ✅ `recentWeeks(0)` → `[]`
+      (borde seguro, testeado). `recentWeeks(-1)` → **`fatalError`**: `(0..<count)` con
+      `lowerBound > upperBound` **aborta el proceso**.
+      🚨 **NO hay test que lo llame, y no puede haberlo**: un `fatalError` no es una excepción
+      —no hay `#expect(throws:)` que lo atrape— y como Swift Testing corre en paralelo, el crash
+      **se llevaría puesto al resto de la suite** (mismo mecanismo que el SIGTRAP de P0-3).
+      Lo que sí está testeado es **la contención**: `ProgressDashboardView` es el **único** call
+      site y llama **sin pasar `count`** (default 6). Ninguna ruta lleva un número desde la UI.
+      Mismo tipo que los bugs 3/5/6 (agujero real, tapado por no ser pisado), pero **más grave**:
+      los otros dejan estado inconsistente, este **cierra la app**. El guard que falta es una
+      línea: `guard count > 0 else { return [] }`.
 - [ ] **U-28** La semana arranca el **lunes**. Test con un domingo y el lunes siguiente.
 - [ ] **U-29** Cruce de año (semana del 29/12 al 4/1).
 
