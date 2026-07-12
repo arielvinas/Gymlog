@@ -317,8 +317,11 @@ ninguna red.
       cuenta, pero una serie sin confirmar **sí** — dos datos igual de provisorios, dos respuestas
       opuestas, en la misma tarjeta. Filtrar `tonnage` por `isDone` alinearía las dos mitades y
       mataría el bug 15.
-- [ ] **U-25** `recentWeeks(6)`: devuelve 6, de la más vieja a la más nueva, la última contiene
-      `today`.
+- [x] **U-25** `recentWeeks(6)`: devuelve 6, de la más vieja a la más nueva, la última contiene
+      hoy. ✅ Semanas **consecutivas** (7 días exactos entre una y la siguiente, sin huecos ni
+      repetidas), cada una con **sus propios** datos, y `count: 1` devuelve solo la de hoy.
+      El orden **no es cosmético**: la vista dibuja el arreglo tal cual, así que invertirlo haría
+      leer la tendencia al revés — parecería que bajás cuando subís.
 - [ ] **U-26** `recentWeeks` sin datos → 6 semanas en cero (es el caso que dibuja la tarjeta vacía).
 - [ ] **U-27** ⚠️ **Bug 11.** `recentWeeks(0)` → `[]`, pero `recentWeeks(-1)` → **crash**.
 - [ ] **U-28** La semana arranca el **lunes**. Test con un domingo y el lunes siguiente.

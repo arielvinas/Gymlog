@@ -262,4 +262,93 @@ struct WeeklyVolumeTests {
         // Si el tonelaje filtrara por `isDone` —como los km filtran por `isCompleted`— las
         // dos mitades contarían lo mismo y el bug 15 desaparecería.
     }
+
+    // MARK: - U-25
+
+    // `recentWeeks` arma la serie de la tendencia: una barra por semana, de izquierda a
+    // derecha. El orden **no es un detalle de presentación** — la vista dibuja el arreglo tal
+    // como viene, así que si estuviera al revés la tendencia se leería invertida (parecería
+    // que bajás cuando subís).
+
+    @Test("U-25 · Devuelve la cantidad pedida, de la más vieja a la más nueva")
+    func recentWeeksAreOrderedOldestFirst() throws {
+        let db = TestDB()
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        let semanas = WeeklyVolume.recentWeeks(6, days: dias, exercises: [], today: miercoles)
+
+        #expect(semanas.count == 6)
+
+        // Cada `weekStart` es anterior al siguiente: la última es la de hoy.
+        let inicios = semanas.map(\.weekStart)
+        #expect(inicios == inicios.sorted(), "De la más vieja a la más nueva")
+
+        // Y las seis son semanas distintas, consecutivas: exactamente 7 días entre una y la
+        // siguiente. Sin huecos ni repetidas.
+        for (anterior, siguiente) in zip(inicios, inicios.dropFirst()) {
+            #expect(siguiente.timeIntervalSince(anterior) == 7 * 24 * 60 * 60)
+        }
+    }
+
+    @Test("U-25 · La última semana es la que contiene hoy")
+    func theLastWeekContainsToday() throws {
+        let db = TestDB()
+
+        // Entrenamiento de esta semana: 8 km corridos y 800 kg levantados.
+        makeDay(miercoles, type: .rodaje, title: "Rodaje 8 km",
+                isCompleted: true, actualKm: 8, in: db.context)
+        let gimnasio = makeDay(miercoles, type: .fuerza, in: db.context)
+        makeExercise("Press banca", on: gimnasio, order: 0, sets: [(80, 10)], in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+        let ejercicios = try db.context.fetch(FetchDescriptor<Exercise>())
+
+        let semanas = WeeklyVolume.recentWeeks(6, days: dias, exercises: ejercicios, today: miercoles)
+        let ultima = try #require(semanas.last)
+
+        // Los datos de hoy caen en la **última** barra, que es la del extremo derecho de la
+        // tarjeta. Si cayeran en la primera, la tendencia mostraría el presente como pasado.
+        #expect(ultima.runKm == 8)
+        #expect(ultima.tonnage == 800)
+
+        // Y la semana empieza el **lunes** (ver U-28): el 17/6/2026 es miércoles, así que su
+        // semana arranca el 15.
+        let cal = PlanConstants.calendar
+        #expect(cal.component(.day, from: ultima.weekStart) == 15)
+    }
+
+    @Test("U-25 · Cada semana recibe solo sus propios datos")
+    func eachWeekGetsItsOwnData() throws {
+        let db = TestDB()
+
+        // Tres semanas seguidas, con volúmenes distintos, para poder distinguirlas.
+        makeDay(date(2026, 6, 3), type: .rodaje, title: "Rodaje 5 km",
+                isCompleted: true, actualKm: 5, in: db.context)
+        makeDay(date(2026, 6, 10), type: .rodaje, title: "Rodaje 10 km",
+                isCompleted: true, actualKm: 10, in: db.context)
+        makeDay(miercoles, type: .rodaje, title: "Rodaje 15 km",
+                isCompleted: true, actualKm: 15, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+        let semanas = WeeklyVolume.recentWeeks(6, days: dias, exercises: [], today: miercoles)
+
+        // Las tres últimas barras: 5, 10, 15. Creciente, como se cargó. Las tres primeras
+        // están vacías (no hay datos tan atrás) y valen 0.
+        #expect(semanas.map(\.runKm) == [0, 0, 0, 5, 10, 15])
+    }
+
+    @Test("U-25 · Pedir una sola semana devuelve la de hoy")
+    func askingForOneWeekReturnsThisWeek() throws {
+        let db = TestDB()
+        makeDay(miercoles, type: .rodaje, title: "Rodaje 8 km",
+                isCompleted: true, actualKm: 8, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+        let semanas = WeeklyVolume.recentWeeks(1, days: dias, exercises: [], today: miercoles)
+
+        // El `(0..<count).reversed()` con count = 1 da `[0]`: un solo offset, el de hoy. Es
+        // el borde inferior del rango útil — el de arriba (0 y negativos) es U-26 y U-27.
+        #expect(semanas.count == 1)
+        #expect(semanas[0].runKm == 8)
+    }
 }
