@@ -187,4 +187,101 @@ struct StreakCalculatorTests {
         // actividad, así que la racha cuenta desde la Semana 1 y se queda en 1 — no en 3.
         #expect(StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 17)) == 1)
     }
+
+    // MARK: - U-32
+
+    // ⚠️ **Bug 2.** `currentWeekStreak` agrupa con `Dictionary(grouping: days, by: { $0.weekTitle })`:
+    // **por el título de la semana, que es un String**, no por semana calendario.
+    //
+    // O sea que la app no pregunta "¿en qué semana cayó este día?" sino "¿qué texto tiene
+    // escrito?". Dos días de semanas distintas con el mismo texto son, para la racha, la misma
+    // semana.
+
+    @Test("U-32 · ⚠️ Dos semanas con el mismo título se fusionan en una")
+    func weeksWithTheSameTitleAreMerged() throws {
+        let db = TestDB()
+
+        // Dos semanas calendario distintas y consecutivas, las dos entrenadas. Pero alguien
+        // les puso el mismo título.
+        semana("Semana 1", empezando: date(2026, 6, 8), completada: true, in: db.context)
+        semana("Semana 1", empezando: date(2026, 6, 15), completada: true, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // ⚠️ La racha dice **1**, no 2: el `Dictionary(grouping:)` las colapsó en una sola
+        // entrada. El usuario entrenó dos semanas seguidas y la app le reconoce una.
+        #expect(
+            StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 17)) == 1,
+            "Comportamiento actual: dos semanas con el mismo texto cuentan como una"
+        )
+    }
+
+    @Test("U-32 · ⚠️ Una semana partida en dos títulos cuenta doble")
+    func oneWeekSplitInTwoTitlesCountsTwice() throws {
+        let db = TestDB()
+
+        // Una **sola** semana calendario (lunes 15 a domingo 21), con dos días entrenados… y
+        // dos títulos distintos.
+        makeDay(date(2026, 6, 15), type: .fuerza, title: "Fuerza A",
+                weekTitle: "Semana 3", isCompleted: true, in: db.context)
+        makeDay(date(2026, 6, 17), type: .rodaje, title: "Rodaje 8 km",
+                weekTitle: "Semana 3 (bis)", isCompleted: true, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // ⚠️ La racha dice **2**: los dos títulos son dos "semanas" para el cálculo. El usuario
+        // entrenó una semana y la app le reconoce dos. El error va para los dos lados.
+        #expect(
+            StreakCalculator.currentWeekStreak(days: dias, today: date(2026, 6, 17)) == 2,
+            "Comportamiento actual: dos títulos en la misma semana cuentan doble"
+        )
+    }
+
+    @Test("U-32 · Por dónde llega la colisión: los títulos no son identidades")
+    func theTitlesAreNotIdentities() {
+        // Hay dos fuentes de `weekTitle`, y ninguna garantiza unicidad en el tiempo.
+        //
+        // **1. `WeekAssigner`**, que titula los días que agrega el usuario. Arma "Semana del
+        // <día> <mes>" — **sin el año**.
+        let info = WeekAssigner.weekInfo(for: date(2026, 6, 17), among: [])
+        #expect(info.title == "Semana del 15 jun")
+        #expect(!info.title.contains("2026"), "⚠️ El año no está en el título")
+
+        // Esa colisión existe pero es remota: hace falta que el mismo día del mes vuelva a
+        // caer lunes, y para el 15 de junio eso recién pasa en **2037**. Real para una app de
+        // entrenamiento continuo, pero no es el camino corto.
+        let en2037 = WeekAssigner.weekInfo(for: date(2037, 6, 17), among: [])
+        #expect(en2037.title == info.title, "⚠️ A once años, el mismo texto")
+
+        // **2. El plan sembrado**, que usa títulos **fijos**: "Semana 1" … "Semana 5". Y este
+        // sí es el camino corto: GymLog es entrenamiento continuo, así que tarde o temprano va
+        // a haber un bloque nuevo. Si ese bloque vuelve a numerar desde "Semana 1" —lo natural—
+        // su primera semana se fusiona con la primera del bloque viejo.
+        //
+        // El problema de fondo no es el formato del título: es que **un texto para mostrar se
+        // está usando como identidad**. Cualquier formato que se elija va a chocar alguna vez.
+    }
+
+    @Test("U-32 · La agrupación correcta sería por semana calendario")
+    func groupingByCalendarWeekWouldFixIt() throws {
+        let db = TestDB()
+
+        // El mismo escenario del primer test: dos semanas calendario, mismo título.
+        semana("Semana 1", empezando: date(2026, 6, 8), completada: true, in: db.context)
+        semana("Semana 1", empezando: date(2026, 6, 15), completada: true, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Agrupando por el **inicio de la semana calendario** —que es lo que el resto de la app
+        // ya hace, ver `WeeklyVolume`— salen dos grupos, no uno. La racha real es 2.
+        let cal = PlanConstants.calendar
+        let porSemanaReal = Dictionary(grouping: dias) {
+            cal.dateInterval(of: .weekOfYear, for: $0.date)?.start ?? $0.date
+        }
+        #expect(porSemanaReal.count == 2, "Dos semanas calendario, dos grupos")
+
+        // El fix es cambiar la clave del `Dictionary(grouping:)`: de `$0.weekTitle` al inicio
+        // de la semana. `weekTitle` es texto para mostrar, no una identidad — y el resto de la
+        // app ya usa el calendario para lo mismo (U-28, U-29).
+    }
 }
