@@ -1,0 +1,54 @@
+#!/bin/bash
+#
+# pre-push — corre los tests unitarios y de integración antes de publicar.
+#
+# Es el gate real. ~40 segundos antes de un push es un precio razonable y ataja casi todas las
+# regresiones sin esperar los 10-15 minutos del CI.
+#
+# NO corre los E2E: tardan ~4 minutos. Esos quedan para el CI.
+#
+# Instalación:  ./scripts/setup-hooks.sh
+# Salteo:       git push --no-verify
+
+set -uo pipefail
+
+RAIZ=$(git rev-parse --show-toplevel)
+cd "$RAIZ" || exit 1
+
+# Si no hay Xcode (por ejemplo en un CI de Linux), no hay nada que correr.
+if ! command -v xcodebuild >/dev/null 2>&1; then
+    echo "pre-push: no hay xcodebuild, se saltea."
+    exit 0
+fi
+
+echo "pre-push: corriendo los tests unitarios…"
+
+salida=$(xcodebuild test \
+    -project Maraton.xcodeproj \
+    -scheme Maraton \
+    -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+    -only-testing:GymLogTests \
+    2>&1)
+estado=$?
+
+if [ $estado -ne 0 ]; then
+    echo ""
+    echo "═══════════════════════════════════════════════════════════════"
+    echo " PUSH BLOQUEADO — los tests no pasan"
+    echo "═══════════════════════════════════════════════════════════════"
+    echo ""
+    # Solo lo que importa: las fallas y los errores de compilación.
+    echo "$salida" | grep -E '^✘|error:|Test run with' | head -20
+    echo ""
+    echo " Corré la suite completa para ver el detalle:"
+    echo "   xcodebuild test -project Maraton.xcodeproj -scheme Maraton \\"
+    echo "     -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \\"
+    echo "     -only-testing:GymLogTests"
+    echo ""
+    echo " Si necesitás publicar igual:  git push --no-verify"
+    echo ""
+    exit 1
+fi
+
+echo "$salida" | grep -E 'Test run with' | head -1
+exit 0

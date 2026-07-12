@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PROYECTO: Maraton.xcodeproj
+  ESQUEMA: Maraton
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Los tres targets se compilan por separado a propósito: correr los tests del
+  # target iOS NO compila el reloj ni la extensión de Live Activity, así que es
+  # fácil romperlos y no enterarse hasta que fallan en el dispositivo.
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build · ${{ matrix.nombre }}
+    # ⚠️ `macos-26`, NO `macos-latest`. Hoy `macos-latest` es macOS 15, cuyo Xcode más nuevo es
+    # 26.3 (SDK de iOS 26.3) — y el proyecto exige un deployment target de **iOS 26.5**. Con esa
+    # imagen el CI no compila siquiera: el SDK queda por debajo del target. `macos-26` trae
+    # Xcode 26.6 y el runtime de iOS 26.5.
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - nombre: iOS
+            destino: "generic/platform=iOS Simulator"
+            esquema: Maraton
+          - nombre: watchOS
+            destino: "generic/platform=watchOS Simulator"
+            esquema: "MaratonWatch Watch App"
+          - nombre: Mac Catalyst
+            destino: "platform=macOS,variant=Mac Catalyst"
+            esquema: Maraton
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seleccionar Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
+      - name: Compilar
+        # `CODE_SIGNING_ALLOWED=NO`: el runner no tiene el certificado de firma, y para compilar
+        # contra el simulador no hace falta.
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project "$PROYECTO" \
+            -scheme "${{ matrix.esquema }}" \
+            -destination "${{ matrix.destino }}" \
+            CODE_SIGNING_ALLOWED=NO
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Unitarios + integración: 336 tests, menos de un segundo de ejecución.
+  # ─────────────────────────────────────────────────────────────────────────────
+  tests:
+    name: Tests · unitarios
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seleccionar Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
+      - name: Elegir un simulador
+        id: sim
+        # El nombre del dispositivo NO se hardcodea: las imágenes de runner cambian el catálogo
+        # entre versiones, y un "iPhone 17 Pro" que hoy existe puede no existir el mes que viene.
+        # Se toma el primer iPhone disponible.
+        run: |
+          DISPOSITIVO=$(xcrun simctl list devices available \
+            | grep -oE 'iPhone [0-9]+[^(]*' | head -1 | sed 's/ *$//')
+          echo "Simulador elegido: $DISPOSITIVO"
+          echo "dispositivo=$DISPOSITIVO" >> "$GITHUB_OUTPUT"
+
+      - name: Correr los tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project "$PROYECTO" \
+            -scheme "$ESQUEMA" \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.dispositivo }}" \
+            -only-testing:GymLogTests \
+            -resultBundlePath TestResults.xcresult
+
+      - name: Guardar el resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-unitarios
+          path: TestResults.xcresult
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # E2E: ~4 minutos. Van en un job aparte para que una falla acá no tape una
+  # regresión de los unitarios (y al revés).
+  # ─────────────────────────────────────────────────────────────────────────────
+  e2e:
+    name: Tests · E2E
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seleccionar Xcode 26.6
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+
+      - name: Elegir un simulador
+        id: sim
+        run: |
+          DISPOSITIVO=$(xcrun simctl list devices available \
+            | grep -oE 'iPhone [0-9]+[^(]*' | head -1 | sed 's/ *$//')
+          echo "Simulador elegido: $DISPOSITIVO"
+          echo "dispositivo=$DISPOSITIVO" >> "$GITHUB_OUTPUT"
+
+      - name: Correr los E2E
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project "$PROYECTO" \
+            -scheme "$ESQUEMA" \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.dispositivo }}" \
+            -only-testing:GymLogUITests \
+            -resultBundlePath E2EResults.xcresult
+
+      - name: Guardar el resultado
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-e2e
+          # Incluye las capturas de pantalla del momento de la falla: es lo primero que uno quiere
+          # ver cuando un test de UI se cae en un runner al que no tiene acceso.
+          path: E2EResults.xcresult
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # El mismo escaneo del hook de pre-commit, por si alguien pusheó con --no-verify.
+  # El hook es la primera línea; esto es la red.
+  # ─────────────────────────────────────────────────────────────────────────────
+  datos-personales:
+    name: Escaneo de datos personales
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Escanear el árbol completo
+        run: ./scripts/scan-pii.sh

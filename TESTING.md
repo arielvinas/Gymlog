@@ -839,9 +839,40 @@ precio razonable y ataja casi todas las regresiones sin esperar al CI.
 targets** — importante, porque el reloj y la extensión **no** se compilan al correr los tests del
 target iOS, y es fácil romperlos sin enterarse.
 
-⚠️ **A verificar al armar el CI:** el proyecto exige **iOS 26.5 / watchOS 26.5** (Xcode 26.6). Hay
-que confirmar que la imagen de runner de GitHub trae un Xcode 26.x. Si no, el CI queda bloqueado
-hasta que actualicen la imagen y la alternativa es un runner self-hosted en la Mac.
+✅ **Verificado, y el riesgo era real.** El proyecto exige un deployment target de **iOS 26.5**:
+
+| Imagen | Xcode más nuevo | Runtime iOS más nuevo | ¿Sirve? |
+|---|---|---|---|
+| `macos-15` (= `macos-latest` hoy) | 26.3 | 26.2 | ❌ **No compila**: el SDK queda por debajo del target |
+| `macos-26` | **26.6** | **26.5** | ✅ |
+
+Por eso el workflow fija **`runs-on: macos-26`**, no `macos-latest`. Con la imagen por defecto el CI
+no habría fallado en los tests: **no habría compilado**, y el error (SDK < deployment target) no
+apunta a la causa. Si algún día `macos-latest` pasa a ser macOS 26, el pin sigue siendo correcto.
+
+El nombre del simulador **no se hardcodea**: se elige el primer iPhone disponible en el runner. Las
+imágenes cambian el catálogo de dispositivos entre versiones, y un `iPhone 17 Pro` que hoy existe
+puede no existir el mes que viene.
+
+### Lo que está armado
+
+| Archivo | Qué hace |
+|---|---|
+| `.githooks/pre-commit` | Escaneo de datos personales (< 2 s). No corre tests. |
+| `.githooks/pre-push` | 336 unitarios (~40 s). No corre los E2E (tardan 4 min). |
+| `scripts/scan-pii.sh` | **Única** fuente de los patrones: la usan el hook **y** el CI. |
+| `scripts/setup-hooks.sh` | `git config core.hooksPath .githooks` |
+| `.github/workflows/ci.yml` | 4 jobs: build ×3 targets, unitarios, E2E, escaneo del árbol. |
+
+Los hooks viven en `.githooks/` (versionados y revisables), no en `.git/hooks/` (que no se commitea
+y se pierde al clonar). **Hay que correr `./scripts/setup-hooks.sh` una vez** por clon.
+
+El escaneo del CI es la **red**, no la primera línea: corre sobre el árbol entero por si alguien
+pusheó con `--no-verify`.
+
+⚠️ El pre-commit mira **solo las líneas agregadas**. Si el dato sensible ya estaba en el archivo,
+el commit no lo empeora, y bloquearlo solo lograría que se empiece a usar `--no-verify` — que es
+como se muere un hook.
 
 **Antes de cada release:** la checklist manual (CloudKit, Live Activity, pulso, HealthKit,
 notificaciones). Nada de eso lo cubre el CI.

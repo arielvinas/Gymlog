@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# pre-commit — escaneo de datos personales y secretos.
+#
+# Este repo es PÚBLICO. El HANDOFF llegó a tener el email y los UDIDs de los dispositivos, y hubo
+# que reescribir el historial para sacarlos. Este hook existe para que no vuelva a pasar.
+#
+# NO corre tests, a propósito: commitear tiene que ser barato. Si tarda 20 segundos, uno empieza a
+# usar --no-verify y el hook deja de servir. Objetivo: menos de 2 segundos.
+#
+# Los patrones viven en scripts/scan-pii.sh, que también usa el CI. Una sola lista.
+#
+# Instalación:  ./scripts/setup-hooks.sh
+# Salteo:       git commit --no-verify
+
+set -uo pipefail
+
+RAIZ=$(git rev-parse --show-toplevel)
+
+# Solo lo que se está por commitear, y solo las líneas agregadas: si el dato sensible ya estaba en
+# el archivo, este commit no lo empeora, y bloquearlo solo lograría que se use --no-verify.
+agregado=$(git diff --cached --unified=0 --diff-filter=ACM | grep '^+' | grep -v '^+++' || true)
+[ -z "$agregado" ] && exit 0
+
+if ! echo "$agregado" | "$RAIZ/scripts/scan-pii.sh"; then
+    echo " COMMIT BLOQUEADO."
+    echo " Si es un falso positivo:  git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+exit 0
