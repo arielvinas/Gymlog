@@ -757,9 +757,18 @@ app inusable.
       sobre "hoy"**: el plan es un bloque de fechas fijas (mayo–julio de 2026) y, según cuándo corra
       el test, hoy puede caer **fuera** de él —hoy, 11/7, ya es después—. Se afirma sobre la tab
       **Plan**, donde el sembrado siempre se ve.
-- [ ] **E2E-02** Navegar el carrusel de días y saltar con la tira de la semana.
-- [ ] **E2E-03** **El recorrido principal:** sesión guiada — cargar peso y reps con la rueda,
-      "Hecho", entra en descanso, saltear, avanza a la serie siguiente.
+- [x] **E2E-02** Navegar el plan: las semanas sembradas se ven, se entra a un día y se vuelve, y
+      las otras tabs siguen respondiendo.
+- [x] **E2E-03** **El recorrido principal:** sesión guiada — arranca en "Serie 1 de 3", "Completar
+      serie" la marca y **entra en descanso** (aparecen "Saltear descanso" y los ±15 s), saltear
+      **avanza a la serie 2**. Y el segundo test cubre el retroceso: "Anterior" está **deshabilitado
+      en la serie 1** y habilitado desde la 2.
+      ⚠️ **Trampa al elegir el día:** los "Fuerza A" de mayo existen en el plan pero están **vacíos**
+      —`StrengthSeed` solo siembra del **9/6 en adelante** (I-29)—, así que tomar el primero que
+      aparece lleva al estado vacío y no hay sesión que empezar. El test usa el del **16/6**.
+      ⚠️ Las `List` de SwiftUI son **perezosas**: una fila que no se dibujó **no está en el árbol de
+      accesibilidad**, y `waitForExistence` no la encuentra nunca por más que espere. Hay que
+      scrollear (`scrollHasta`), no esperar.
 - [ ] **E2E-04** Completar una sesión entera → el día queda marcado como completado.
 - [ ] **E2E-05** Cambiar el próximo ejercicio a mitad de sesión.
 - [ ] **E2E-06** Marcar un suplemento y verlo reflejado en Progreso.

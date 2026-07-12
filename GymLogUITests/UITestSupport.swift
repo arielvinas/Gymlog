@@ -39,4 +39,30 @@ extension XCTestCase {
         XCTAssertTrue(apareció, "No apareció: \(descripción)", file: file, line: line)
         return apareció
     }
+
+    /// Scrollea hasta que el elemento aparezca y se pueda tocar.
+    ///
+    /// Hace falta porque las `List` de SwiftUI son **perezosas**: una fila que todavía no se
+    /// dibujó no está en el árbol de accesibilidad, así que `waitForExistence` no la encuentra
+    /// nunca por más que uno espere. La lista del plan tiene decenas de días.
+    @discardableResult
+    func scrollHasta(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        _ descripción: String,
+        intentos: Int = 12,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> Bool {
+        for _ in 0..<intentos {
+            if element.exists && element.isHittable { return true }
+            app.swipeUp()
+        }
+        XCTAssertTrue(
+            element.exists && element.isHittable,
+            "No apareció ni scrolleando: \(descripción)",
+            file: file, line: line
+        )
+        return false
+    }
 }
