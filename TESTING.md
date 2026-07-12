@@ -348,7 +348,14 @@ ninguna red.
       que el `firstWeekday = 2` de `PlanConstants` parecía redundante. No lo es: es lo que sostiene
       el invariante **si alguien toca el locale** (en-US arranca el domingo). Hace que el lunes sea
       una decisión del plan y no una consecuencia del idioma.
-- [ ] **U-29** Cruce de año (semana del 29/12 al 4/1).
+- [x] **U-29** Cruce de año (semana del lunes 29/12/2025 al domingo 4/1/2026). ✅ La semana no se
+      parte: los km de diciembre y los de enero caen en la **misma** barra, y preguntar desde
+      cualquiera de los dos lados da lo mismo.
+      El riesgo real era el otro: dos fechas con el **mismo número de semana** separadas por 12
+      meses (1/2025 y 1/2026). No se mezclan — `isDate(_:equalTo:toGranularity: .weekOfYear)`
+      compara la semana **y el año al que pertenece**, no solo el número.
+      Y la tendencia cruza el año sin saltear ni repetir: `recentWeeks` avanza **restando semanas
+      a una fecha**, no restando números, así que el reinicio del 1/1 no la afecta.
 
 ### Racha (`StreakCalculator`)
 

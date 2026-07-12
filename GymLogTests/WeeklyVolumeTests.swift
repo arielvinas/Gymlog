@@ -538,4 +538,72 @@ struct WeeklyVolumeTests {
         // O sea: la línea explícita es la que hace que el lunes sea una **decisión del plan**
         // y no una consecuencia del idioma. Vale la pena tenerla.
     }
+
+    // MARK: - U-29
+
+    // El cruce de año: la semana del **lunes 29/12/2025 al domingo 4/1/2026** vive a caballo de
+    // dos años. Es la trampa clásica de `weekOfYear`, porque el número de semana se reinicia:
+    // el 29/12 puede ser "semana 1" y el 5/1 también, y una comparación ingenua los metería en
+    // la misma barra con un año de diferencia.
+
+    @Test("U-29 · Una semana a caballo de dos años sigue siendo una sola semana")
+    func aWeekAcrossNewYearIsOneWeek() throws {
+        let db = TestDB()
+
+        // Lunes 29/12/2025 y domingo 4/1/2026: primer y último día de la **misma** semana.
+        makeDay(date(2025, 12, 29), type: .rodaje, title: "Rodaje 6 km",
+                isCompleted: true, actualKm: 6, in: db.context)
+        makeDay(date(2026, 1, 4), type: .fondo, title: "Fondo 14 km",
+                isCompleted: true, actualKm: 14, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Los 20 km caen juntos, aunque uno sea de diciembre y el otro de enero. El año
+        // cambia en el medio de la semana y no la parte.
+        #expect(WeeklyVolume.actualKm(for: date(2025, 12, 31), among: dias) == 20)
+        #expect(WeeklyVolume.actualKm(for: date(2026, 1, 2), among: dias) == 20,
+                "Preguntar desde enero da lo mismo que desde diciembre")
+    }
+
+    @Test("U-29 · La misma semana del año anterior no se confunde con esta")
+    func theSameWeekNumberOfAnotherYearIsNotTheSameWeek() throws {
+        let db = TestDB()
+
+        // Acá está el riesgo real. Estas dos fechas caen en semanas con el **mismo número**
+        // (la primera del año), separadas por 12 meses. Si el filtro comparara solo
+        // `weekOfYear` —sin el año— las sumaría en la misma barra.
+        makeDay(date(2025, 1, 2), type: .rodaje, title: "Rodaje 5 km",
+                isCompleted: true, actualKm: 5, in: db.context)
+        makeDay(date(2026, 1, 2), type: .rodaje, title: "Rodaje 10 km",
+                isCompleted: true, actualKm: 10, in: db.context)
+
+        let dias = try db.context.fetch(FetchDescriptor<WorkoutDay>())
+
+        // Cada una en la suya. `isDate(_:equalTo:toGranularity: .weekOfYear)` compara la
+        // semana **y** el año al que pertenece, así que no las mezcla.
+        #expect(WeeklyVolume.actualKm(for: date(2025, 1, 2), among: dias) == 5)
+        #expect(WeeklyVolume.actualKm(for: date(2026, 1, 2), among: dias) == 10)
+    }
+
+    @Test("U-29 · La tendencia cruza el año sin saltearse ni repetir semanas")
+    func theTrendCrossesTheYearBoundary() {
+        // Seis semanas hacia atrás desde el 7/1/2026 caen cuatro en 2025 y dos en 2026.
+        let semanas = WeeklyVolume.recentWeeks(6, days: [], exercises: [],
+                                               today: date(2026, 1, 7))
+
+        #expect(semanas.count == 6)
+
+        // Siguen siendo consecutivas: 7 días exactos entre una y la siguiente, sin repetir ni
+        // saltear. El reinicio del número de semana el 1/1 no rompe la serie, porque
+        // `recentWeeks` avanza restando semanas a una fecha, no restando números.
+        let inicios = semanas.map(\.weekStart)
+        for (anterior, siguiente) in zip(inicios, inicios.dropFirst()) {
+            #expect(siguiente.timeIntervalSince(anterior) == 7 * 24 * 60 * 60)
+        }
+        #expect(Set(inicios).count == 6, "Ninguna repetida")
+
+        // Y todas siguen arrancando un lunes, del lado que sea del año nuevo.
+        let cal = PlanConstants.calendar
+        #expect(inicios.allSatisfy { cal.component(.weekday, from: $0) == 2 })
+    }
 }
