@@ -164,4 +164,127 @@ struct LiveSessionConnectivityTests {
         #expect(!algo)
         #expect(canal.latestSnapshot == nil)
     }
+
+    // MARK: - I-35 · La política de entrega
+
+    /// Un `WCSession` de mentira: anota por dónde salió cada cosa.
+    @MainActor
+    private final class TransporteEspía: LiveSessionTransport {
+        var isActivated = true
+        var isReachable = false
+
+        private(set) var contextos: [[String: Any]] = []
+        private(set) var mensajes: [[String: Any]] = []
+        private(set) var userInfos: [[String: Any]] = []
+
+        func updateApplicationContext(_ payload: [String: Any]) { contextos.append(payload) }
+        func sendMessage(_ payload: [String: Any]) { mensajes.append(payload) }
+        func transferUserInfo(_ payload: [String: Any]) { userInfos.append(payload) }
+    }
+
+    @Test("I-35 · Con el contraparte accesible, el snapshot va por mensaje (baja latencia)")
+    func aReachableSnapshotGoesByMessage() {
+        let canal = LiveSessionConnectivity()
+        let espía = TransporteEspía()
+        espía.isReachable = true
+        canal.transport = espía
+
+        canal.send(snapshot: snap(sesiónA, date(2026, 7, 1)))
+
+        #expect(espía.mensajes.count == 1)
+        #expect(espía.userInfos.isEmpty)
+        // Y **además** por contexto: es el último estado, para cuando el iPhone reabra.
+        #expect(espía.contextos.count == 1)
+    }
+
+    @Test("I-35 · Sin el contraparte accesible, el snapshot va por userInfo (despierta la app)")
+    func anUnreachableSnapshotGoesByUserInfo() {
+        let canal = LiveSessionConnectivity()
+        let espía = TransporteEspía()
+        espía.isReachable = false
+        canal.transport = espía
+
+        canal.send(snapshot: snap(sesiónA, date(2026, 7, 1)))
+
+        // `transferUserInfo` es durable y **despierta la app en background**: es lo único que
+        // mantiene viva la Live Activity con la pantalla bloqueada. Si esto se rompiera, el
+        // cronómetro de la pantalla de bloqueo se congelaría y nadie se daría cuenta en un test
+        // de UI.
+        #expect(espía.userInfos.count == 1)
+        #expect(espía.mensajes.isEmpty)
+        #expect(espía.contextos.count == 1, "El contexto sale igual, accesible o no")
+    }
+
+    @Test("I-35 · El comando NO va por contexto: sería una orden fantasma al reabrir")
+    func aCommandNeverGoesByApplicationContext() {
+        let canal = LiveSessionConnectivity()
+        let espía = TransporteEspía()
+        espía.isReachable = true
+        canal.transport = espía
+
+        canal.send(
+            command: LiveSessionCommand(
+                sessionID: sesiónA, action: .completeCurrent, sentAt: date(2026, 7, 1)
+            )
+        )
+
+        #expect(espía.mensajes.count == 1)
+        // El `applicationContext` se **reentrega** cada vez que la app reabre. Un snapshot
+        // reentregado es inofensivo (la regla de I-33 lo descarta); un comando reentregado sería
+        // un "Hecho" fantasma que marca una serie que nadie hizo.
+        #expect(espía.contextos.isEmpty)
+    }
+
+    @Test("I-35 · El comando también cae a userInfo si el contraparte no está accesible")
+    func anUnreachableCommandFallsBackToUserInfo() {
+        let canal = LiveSessionConnectivity()
+        let espía = TransporteEspía()
+        espía.isReachable = false
+        canal.transport = espía
+
+        canal.send(
+            command: LiveSessionCommand(
+                sessionID: sesiónA, action: .end, sentAt: date(2026, 7, 1)
+            )
+        )
+
+        #expect(espía.userInfos.count == 1)
+        #expect(espía.mensajes.isEmpty)
+        #expect(espía.contextos.isEmpty)
+    }
+
+    @Test("I-35 · Sin la sesión activada no sale nada")
+    func nothingIsSentBeforeActivation() {
+        let canal = LiveSessionConnectivity()
+        let espía = TransporteEspía()
+        espía.isActivated = false
+        espía.isReachable = true
+        canal.transport = espía
+
+        canal.send(snapshot: snap(sesiónA, date(2026, 7, 1)))
+        canal.send(
+            command: LiveSessionCommand(
+                sessionID: sesiónA, action: .end, sentAt: date(2026, 7, 1)
+            )
+        )
+
+        #expect(espía.mensajes.isEmpty)
+        #expect(espía.userInfos.isEmpty)
+        #expect(espía.contextos.isEmpty)
+        #expect(!canal.isReachable, "Activada manda sobre accesible")
+    }
+
+    @Test("I-35 · Sin transporte (Mac Catalyst) los envíos son no-op, no un crash")
+    func withoutATransportSendingIsANoOp() {
+        let canal = LiveSessionConnectivity()   // `transport` en nil: es el caso de Mac Catalyst
+
+        canal.send(snapshot: snap(sesiónA, date(2026, 7, 1)))
+        canal.send(
+            command: LiveSessionCommand(
+                sessionID: sesiónA, action: .end, sentAt: date(2026, 7, 1)
+            )
+        )
+
+        #expect(!canal.isReachable)
+    }
 }

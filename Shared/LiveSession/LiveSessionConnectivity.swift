@@ -22,10 +22,31 @@ import Observation
 import WatchConnectivity
 #endif
 
+/// Lo que `LiveSessionConnectivity` necesita del canal, y nada más.
+///
+/// Existe para poder testear la **política de entrega** —qué sale por dónde según si el
+/// contraparte está accesible— sin un `WCSession` real, que no se puede instanciar ni simular:
+/// es un singleton del sistema que necesita dos dispositivos emparejados.
+@MainActor
+protocol LiveSessionTransport: AnyObject {
+    var isActivated: Bool { get }
+    var isReachable: Bool { get }
+    /// Último estado durable: reemplaza al anterior en vez de encolarse.
+    func updateApplicationContext(_ payload: [String: Any])
+    /// Baja latencia; requiere que el contraparte esté accesible.
+    func sendMessage(_ payload: [String: Any])
+    /// Entrega durable que **despierta la app en background**.
+    func transferUserInfo(_ payload: [String: Any])
+}
+
 @MainActor
 @Observable
 final class LiveSessionConnectivity: NSObject {
     static let shared = LiveSessionConnectivity()
+
+    /// El canal por donde sale todo. Lo pone `activate()`; en Mac Catalyst queda `nil` (no hay
+    /// WatchConnectivity) y todos los envíos se vuelven no-op. Los tests le enchufan un doble.
+    var transport: LiveSessionTransport?
 
     /// Último snapshot recibido (lo observa la UI del iPhone).
     private(set) var latestSnapshot: LiveSessionSnapshot?
@@ -51,56 +72,48 @@ final class LiveSessionConnectivity: NSObject {
         if session.activationState != .activated {
             session.activate()
         }
+        transport = WCSessionTransport(session: session)
         #endif
     }
 
     /// `true` si el contraparte está accesible en este momento.
     var isReachable: Bool {
-        #if !targetEnvironment(macCatalyst)
-        guard WCSession.isSupported() else { return false }
-        let session = WCSession.default
-        return session.activationState == .activated && session.isReachable
-        #else
-        return false
-        #endif
+        guard let transport else { return false }
+        return transport.isActivated && transport.isReachable
     }
 
     // MARK: - Emitir
 
     /// Difunde un snapshot del estado de la sesión (reloj → iPhone).
+    ///
+    /// El snapshot va **siempre** por `updateApplicationContext` —el último estado, para cuando la
+    /// app del iPhone reabra— *además* del envío en vivo. El comando no: un comando viejo reentregado
+    /// al reabrir la app sería una orden fantasma.
     func send(snapshot: LiveSessionSnapshot) {
-        #if !targetEnvironment(macCatalyst)
-        guard WCSession.isSupported(),
+        guard let transport, transport.isActivated,
               let payload = LiveSessionWire.payload(for: snapshot) else { return }
-        let session = WCSession.default
-        guard session.activationState == .activated else { return }
 
-        // Último estado durable, para cuando la app del iPhone reabra.
-        try? session.updateApplicationContext(payload)
-
-        if session.isReachable {
-            session.sendMessage(payload, replyHandler: nil, errorHandler: nil)
-        } else {
-            // Despierta la app del iPhone en background para refrescar la Live Activity.
-            session.transferUserInfo(payload)
-        }
-        #endif
+        transport.updateApplicationContext(payload)
+        deliver(payload, over: transport)
     }
 
     /// Manda un comando para controlar la sesión a distancia (iPhone → reloj).
     func send(command: LiveSessionCommand) {
-        #if !targetEnvironment(macCatalyst)
-        guard WCSession.isSupported(),
+        guard let transport, transport.isActivated,
               let payload = LiveSessionWire.payload(for: command) else { return }
-        let session = WCSession.default
-        guard session.activationState == .activated else { return }
 
-        if session.isReachable {
-            session.sendMessage(payload, replyHandler: nil, errorHandler: nil)
+        deliver(payload, over: transport)
+    }
+
+    /// Accesible → `sendMessage` (baja latencia, en vivo). No accesible → `transferUserInfo`, que
+    /// es durable y **despierta la app en background**: es lo que mantiene viva la Live Activity
+    /// con la pantalla bloqueada.
+    private func deliver(_ payload: [String: Any], over transport: LiveSessionTransport) {
+        if transport.isReachable {
+            transport.sendMessage(payload)
         } else {
-            session.transferUserInfo(payload)
+            transport.transferUserInfo(payload)
         }
-        #endif
     }
 
     // MARK: - Recibir
@@ -135,6 +148,33 @@ final class LiveSessionConnectivity: NSObject {
         }
     }
 }
+
+// MARK: - El transporte real
+
+#if !targetEnvironment(macCatalyst)
+/// El `WCSession` de verdad, detrás del protocolo. No tiene lógica: solo traduce.
+@MainActor
+final class WCSessionTransport: LiveSessionTransport {
+    private let session: WCSession
+
+    init(session: WCSession) { self.session = session }
+
+    var isActivated: Bool { session.activationState == .activated }
+    var isReachable: Bool { session.isReachable }
+
+    func updateApplicationContext(_ payload: [String: Any]) {
+        try? session.updateApplicationContext(payload)
+    }
+
+    func sendMessage(_ payload: [String: Any]) {
+        session.sendMessage(payload, replyHandler: nil, errorHandler: nil)
+    }
+
+    func transferUserInfo(_ payload: [String: Any]) {
+        session.transferUserInfo(payload)
+    }
+}
+#endif
 
 // MARK: - WCSessionDelegate
 

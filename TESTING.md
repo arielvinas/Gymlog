@@ -737,9 +737,14 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       reinicia y arranca una sesión nueva, el iPhone tiene que seguirla.
 - [x] **I-34** `handle(_:)` dispara `onSnapshot` / `onCommand` según el payload; un snapshot
       descartado **no avisa ni pisa el estado**; un diccionario desconocido no hace nada.
-- [ ] **I-35** Política de entrega: reachable → `sendMessage`; no reachable → `transferUserInfo`;
-      los snapshots además siempre van por `updateApplicationContext`, los comandos no. *(Requiere
-      protocolizar `WCSession` — opcional, se puede diferir.)*
+- [x] **I-35** Política de entrega, con `WCSession` protocolizado (`LiveSessionTransport` +
+      `WCSessionTransport`, que solo traduce). Accesible → `sendMessage` (baja latencia); no
+      accesible → `transferUserInfo`, que es **durable y despierta la app en background**: es lo
+      único que mantiene viva la Live Activity con la pantalla bloqueada. Los **snapshots** además
+      salen **siempre** por `updateApplicationContext`; los **comandos no** —el contexto se
+      reentrega al reabrir la app, y un snapshot reentregado es inofensivo (I-33 lo descarta), pero
+      un comando reentregado sería un **"Hecho" fantasma** que marca una serie que nadie hizo—.
+      Sin activar no sale nada; **sin transporte (Mac Catalyst) los envíos son no-op, no un crash**.
 
 ---
 
