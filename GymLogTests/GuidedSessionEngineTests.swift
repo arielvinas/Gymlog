@@ -1827,4 +1827,207 @@ struct GuidedSessionEngineTests {
         // la sugerencia como un valor tentativo.
         #expect(engine.suggestedWeight(for: paso) == nil, "Ya tiene los 70 del prellenado")
     }
+
+    // MARK: - I-19
+
+    // `apply(_:)` es la **superficie remota** del engine: por acá entran los botones del
+    // espejo del iPhone y de la Live Activity. Es la única entrada que no controla la vista
+    // del reloj, y por eso es la única que tiene que defenderse sola.
+    //
+    // De qué se defiende: el que manda el comando dibuja un **snapshot que puede estar
+    // viejo**. Entre que el iPhone pinta el botón y que el reloj recibe el toque hay un
+    // viaje de WatchConnectivity — cientos de milisegundos en los que el reloj puede haber
+    // cambiado de fase solo.
+
+    @Test("I-19 · Un comando de otra sesión se ignora")
+    func commandsFromAnotherSessionAreIgnored() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.beginLiveSession()
+
+        // Pasa de verdad: la Live Activity de una sesión de ayer que quedó sin cerrar, o el
+        // espejo abierto en otro día. Sin este filtro, un botón viejo movería la sesión de
+        // hoy.
+        engine.apply(LiveSessionCommand(sessionID: UUID(), action: .completeCurrent))
+
+        #expect(engine.index == 0)
+        #expect(engine.phase == .logging)
+        #expect(!day.orderedExercises[0].orderedSets[0].isDone)
+    }
+
+    @Test("I-19 · Los comandos hacen lo mismo que los métodos directos")
+    func remoteCommandsMatchTheDirectMethods() throws {
+        let db = TestDB()
+
+        // Espejo: el mismo día, dos engines. Uno se maneja con los métodos (como el reloj),
+        // el otro solo con comandos remotos (como si todo viniera del iPhone). Tienen que
+        // terminar en el mismo estado.
+        let directoDay = dayWithTwoExercises(in: db.context)
+        let directo = GuidedSessionEngine()
+        directo.start(day: directoDay, context: db.context)
+
+        let remotoDay = dayWithTwoExercises(in: db.context)
+        let remoto = GuidedSessionEngine()
+        remoto.start(day: remotoDay, context: db.context)
+        remoto.beginLiveSession()
+        let id = remoto.sessionID
+
+        // Completar la serie.
+        directo.completeCurrent()
+        remoto.apply(LiveSessionCommand(sessionID: id, action: .completeCurrent))
+        #expect(remoto.phase == directo.phase)
+        #expect(remoto.index == directo.index)
+
+        // Ajustar el descanso.
+        directo.adjustRest(by: 15)
+        remoto.apply(LiveSessionCommand(sessionID: id, action: .adjustRest(15)))
+        #expect(remoto.restTotal == directo.restTotal)
+        #expect(remoto.restTotal == 105)
+
+        // Volver atrás (desde el descanso: no mueve el índice, ver I-10).
+        directo.goBackFromResting()
+        remoto.apply(LiveSessionCommand(sessionID: id, action: .goBack))
+        #expect(remoto.phase == directo.phase)
+        #expect(remoto.phase == .logging)
+        #expect(remoto.index == directo.index)
+
+        // Saltear el descanso.
+        directo.completeCurrent()
+        remoto.apply(LiveSessionCommand(sessionID: id, action: .completeCurrent))
+        directo.skipRest()
+        remoto.apply(LiveSessionCommand(sessionID: id, action: .skipRest))
+        #expect(remoto.phase == directo.phase)
+        #expect(remoto.index == directo.index)
+        #expect(remoto.index == 1)
+    }
+
+    @Test("I-19 · Completar y saltear sí se protegen de un snapshot viejo")
+    func completeAndSkipAreGuardedAgainstStaleSnapshots() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.beginLiveSession()
+        let id = engine.sessionID
+
+        // El reloj está descansando. El iPhone todavía dibuja la pantalla de carga y el
+        // usuario aprieta "Hecho": el comando llega tarde.
+        engine.completeCurrent()
+        #expect(engine.phase == .resting)
+
+        engine.apply(LiveSessionCommand(sessionID: id, action: .completeCurrent))
+        #expect(engine.index == 0, "Se descartó: ya no estaba cargando")
+
+        // Y al revés: el reloj ya salió del descanso, llega un "saltear" tardío. Sin la
+        // guarda, esto sería el bug 5 (saltear una serie entera). Ver I-11.
+        engine.skipRest()
+        #expect(engine.phase == .logging)
+        engine.apply(LiveSessionCommand(sessionID: id, action: .skipRest))
+        #expect(engine.index == 1, "Se descartó: ya no estaba descansando")
+    }
+
+    @Test("I-19 · ⚠️ Un 'Anterior' que llega tarde resucita una sesión terminada")
+    func aLateGoBackResurrectsAFinishedSession() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        engine.start(day: day, context: db.context)
+        engine.beginLiveSession()
+        let id = engine.sessionID
+
+        // La sesión se completa entera en el reloj.
+        for _ in 0..<4 {
+            engine.completeCurrent()
+            engine.skipRest()
+        }
+        engine.completeCurrent()
+        #expect(engine.phase == .done)
+        #expect(day.isCompleted)
+
+        // La carrera: el espejo del iPhone todavía mostraba la última serie con el botón
+        // "Anterior" (`LiveSessionMirrorView` lo dibuja en la fase de carga). El usuario lo
+        // aprieta justo cuando el reloj está confirmando la última serie. El comando llega
+        // con la sesión ya en `.done`.
+        engine.apply(LiveSessionCommand(sessionID: id, action: .goBack))
+
+        // ⚠️ `apply(.goBack)` es el **único** comando sin guarda de fase: su `else if index
+        // > 0` se cumple igual en `.done`, así que llama a `goBackFromLogging()`.
+        #expect(engine.phase == .logging, "⚠️ La sesión terminada volvió a estar en curso")
+
+        // Y el índice **retrocede**: `goBackFromLogging` está pensado para volver desde la
+        // serie que estás cargando, pero en `.done` no estabas cargando ninguna. Resultado:
+        // te lleva a la **anteúltima** serie y des-marca esa.
+        #expect(engine.index == 3)
+
+        let remo = day.orderedExercises[1]
+        #expect(!remo.orderedSets[0].isDone, "⚠️ Des-marcó la anteúltima serie…")
+        #expect(remo.orderedSets[1].isDone, "⚠️ …y dejó marcada la última")
+
+        // O sea que el día queda con un **hueco en el medio** —serie 2 hecha, serie 1 no— y
+        // encima sigue marcado como completo. Nadie lo devuelve a `.done`: la fase la pone
+        // solo `finish()`, y `finish()` solo corre desde `completeCurrent` en el último paso
+        // (ver I-15). Al retomar, `firstIncompleteIndex` manda al hueco.
+        #expect(day.isCompleted, "⚠️ El día sigue completo, con una serie sin hacer")
+
+        // A diferencia de los bugs 3, 5 y 6, esto **no lo tapa la UI**: la guarda que falta
+        // es justamente contra la ventana en la que la UI está desactualizada. Lo que lo
+        // hace poco probable es el tamaño de la ventana (el viaje de WatchConnectivity), no
+        // una validación.
+    }
+
+    @Test("I-19 · Terminar a distancia cierra la sesión sin marcar el día")
+    func endingRemotelyClosesTheSessionWithoutCompletingTheDay() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var descansosTerminados = 0
+        engine.onRestEnded = { descansosTerminados += 1 }
+        engine.start(day: day, context: db.context)
+        engine.beginLiveSession()
+        let id = engine.sessionID
+
+        // Abandona en el medio del descanso de la primera serie.
+        engine.completeCurrent()
+        #expect(engine.phase == .resting)
+        descansosTerminados = 0
+
+        engine.apply(LiveSessionCommand(sessionID: id, action: .end))
+
+        #expect(engine.phase == .done)
+        #expect(engine.restEndDate == nil)
+        #expect(descansosTerminados == 1, "Cancela la notificación de descanso pendiente")
+
+        // Clave: cerrar **no** es completar. El día queda sin marcar y las series sin hacer
+        // siguen sin hacer, así que al volver se retoma donde se dejó (ver I-15).
+        #expect(!day.isCompleted)
+        #expect(!day.orderedExercises[0].orderedSets[1].isDone)
+    }
+
+    @Test("I-19 · Terminar dos veces es inofensivo")
+    func endingTwiceIsHarmless() {
+        let db = TestDB()
+        let day = dayWithTwoExercises(in: db.context)
+
+        let engine = GuidedSessionEngine()
+        var cambios = 0
+        engine.start(day: day, context: db.context)
+        engine.beginLiveSession()
+        engine.onStateChanged = { cambios += 1 }
+        let id = engine.sessionID
+
+        engine.apply(LiveSessionCommand(sessionID: id, action: .end))
+        #expect(cambios == 1)
+
+        // `endSession` arranca con `guard phase != .done`. Importa porque el botón de cerrar
+        // puede tocarse dos veces, o llegar duplicado por el canal.
+        engine.apply(LiveSessionCommand(sessionID: id, action: .end))
+        #expect(engine.phase == .done)
+        #expect(cambios == 1, "El segundo cierre no vuelve a difundir")
+    }
 }

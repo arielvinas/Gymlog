@@ -42,6 +42,8 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. | U-27, U-35 |
 | **12** | 🆕 **Reabrir un día terminado reinicia la sesión.** ✅ **CONFIRMADO y alcanzable** (I-15). `firstIncompleteIndex` hace `firstIndex { … } ?? 0`: sin series pendientes devuelve **0**, indistinguible de "la primera está pendiente". El botón "Empezar sesión guiada" **no está gateado por `isCompleted`**, así que abrir un día ya entrenado te deja en la serie 1 con el botón de completar listo — y seguir el flujo arranca un descanso de 90 s y rehace la sesión. La fase `.done` solo la pone `finish()`, o sea que **vive en memoria y no sobrevive a cerrar la sesión**. Datos no se pierden. **Pendiente de arreglar** — ⚠️ **ojo con el fix**: ver la nota de abajo. | I-15 ✅ |
 
+| **13** | 🆕 **Un "Anterior" que llega tarde resucita una sesión terminada.** ✅ **CONFIRMADO** (I-19). `apply(.goBack)` es el **único** comando sin guarda de fase: su `else if index > 0` se cumple igual en `.done`. La carrera es real: el espejo del iPhone dibuja "Anterior" en la fase de carga, y entre el toque y la llegada del comando al reloj hay un viaje de WatchConnectivity. Efecto: la sesión vuelve a `.logging`, el índice retrocede y **des-marca la anteúltima serie** (no la última), dejando el día **marcado como completo pero con un hueco**. Nadie lo devuelve a `.done`. **A diferencia de los bugs 3, 5 y 6, la UI no lo tapa** — la guarda que falta es precisamente contra la ventana en que la UI está vieja. **Pendiente de arreglar.** | I-19 ✅ |
+
 Además, dos contradicciones entre el código y sus comentarios, que hay que resolver decidiendo
 cuál gana: `applyPlanUpdates` dice "los días que el usuario borre no se vuelven a insertar" pero
 compara por fecha (I-23), y `taperVariant` dice "sin el trabajo de pierna" pero solo saca
@@ -397,9 +399,13 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       una descarga — efecto: la sugerencia **no baja** si aflojás el final); y `fetchLimit = 10`
       hace que si las **10** sesiones más recientes del ejercicio no tienen peso, la sugerencia
       desaparezca **sin explicación**.
-- [ ] **I-19** `apply(_ command:)` produce **la misma transición** que el método directo, para cada
-      `LiveSessionCommand`. Ignora comandos con otro `sessionID`. ⚠️ `apply(.goBack)` desde `.done`
-      **resucita** la sesión a `.logging`.
+- [x] **I-19** ⚠️ **Bug 13 (nuevo) — CONFIRMADO, y este NO lo tapa la UI.** ✅ `apply(_:)` produce la
+      misma transición que el método directo (test espejo: dos engines, uno por métodos y otro solo
+      por comandos) e ignora los de otro `sessionID`. `completeCurrent` y `skipRest` **sí** se
+      protegen de un snapshot viejo; `.end` es idempotente y **cerrar no es completar** (el día
+      queda sin marcar). Pero `apply(.goBack)` **no valida la fase**: desde `.done` resucita la
+      sesión, retrocede el índice y **des-marca la anteúltima serie**, dejando el día completo con
+      un hueco. **Pendiente de arreglar.**
 - [ ] **I-20** ⚠️ **Hallazgo de I-11:** `loggedSetsCount` —lo que la Live Activity muestra como
       "series cargadas"— cuenta series **con datos** (`reps != nil || weight != nil`), y el
       prellenado ya les pone las reps objetivo. O sea: cuenta la serie actual, todavía sin
