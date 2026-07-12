@@ -47,6 +47,17 @@ enum AppData {
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
     }
 
+    /// `true` cuando la app fue lanzada por un test de UI (con el argumento `-uitesting`).
+    ///
+    /// A diferencia de los unitarios, acá la app corre como **proceso aparte** y arranca de
+    /// verdad: hay que hacerla determinística. Con este flag, el contenedor es **en memoria** y los
+    /// flags de sembrado también, así que **cada test arranca con el plan recién sembrado**, sin
+    /// arrastrar lo que dejó la corrida anterior en el simulador. Sin esto, el primer test siembra
+    /// y el segundo encuentra el flag ya puesto: dos estados distintos, y los E2E salen flaky.
+    static var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("-uitesting")
+    }
+
     /// Crea el contenedor. Con `iCloudSyncEnabled` usa CloudKit (con respaldo
     /// local si no está disponible); si no, almacenamiento local — offline-first.
     ///

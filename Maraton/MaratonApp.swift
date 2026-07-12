@@ -24,6 +24,17 @@ struct MaratonApp: App {
             return
         }
 
+        // Bajo un test de UI la app arranca de verdad, pero sobre una base **efímera**: contenedor
+        // y flags de sembrado en memoria, plan sembrado desde cero. Así cada test empieza igual, sin
+        // arrastrar lo que dejó la corrida anterior en el simulador. Tampoco se abre el canal con el
+        // reloj: no hay reloj emparejado, y el `transferUserInfo` encolaría entregas que nadie lee.
+        if AppData.isUITesting {
+            container = AppData.makeContainer(inMemory: true)
+            AppData.seedFlags = InMemorySeedFlagStore()
+            AppData.seed(context: container.mainContext)
+            return
+        }
+
         container = AppData.makeContainer()
 
         // Pre-carga el plan, aplica novedades por versión y siembra la rutina

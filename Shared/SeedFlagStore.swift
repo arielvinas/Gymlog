@@ -68,3 +68,24 @@ struct DefaultSeedFlagStore: SeedFlagStore {
         cloud?.synchronize()
     }
 }
+
+/// Store en memoria: no toca `UserDefaults` ni la nube, y muere con el proceso.
+///
+/// Lo usan los tests **y** la propia app cuando arranca con `-uitesting` (ver `AppData.isUITesting`):
+/// sin él, cada corrida de tests de UI escribiría los flags de sembrado en el simulador, y la
+/// segunda corrida arrancaría con el plan "ya sembrado" y un estado distinto de la primera.
+///
+/// Es una `class` a propósito: quien la inyecta necesita ver, desde su propia referencia, lo que
+/// el seed escribió.
+final class InMemorySeedFlagStore: SeedFlagStore, @unchecked Sendable {
+    private var valores: [String: Int]
+
+    init(_ inicial: [String: Int] = [:]) {
+        valores = inicial
+    }
+
+    func integer(forKey key: String) -> Int { valores[key] ?? 0 }
+    func setInteger(_ value: Int, forKey key: String) { valores[key] = value }
+    func bool(forKey key: String) -> Bool { (valores[key] ?? 0) != 0 }
+    func setBool(_ value: Bool, forKey key: String) { valores[key] = value ? 1 : 0 }
+}

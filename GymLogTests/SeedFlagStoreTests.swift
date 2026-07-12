@@ -12,24 +12,6 @@ import Foundation
 import Testing
 @testable import Maraton
 
-/// Store en memoria. Es lo que los tests de sembrado le enchufan a `AppData.seedFlags` para no
-/// tocar `UserDefaults` ni el Key-Value Store de iCloud.
-///
-/// Es una `class` a propósito: el seed la lee y la escribe a través de `AppData.seedFlags`, y el
-/// test necesita ver esas escrituras desde su propia referencia.
-final class InMemorySeedFlagStore: SeedFlagStore, @unchecked Sendable {
-    private var valores: [String: Int] = [:]
-
-    init(_ inicial: [String: Int] = [:]) {
-        valores = inicial
-    }
-
-    func integer(forKey key: String) -> Int { valores[key] ?? 0 }
-    func setInteger(_ value: Int, forKey key: String) { valores[key] = value }
-    func bool(forKey key: String) -> Bool { (valores[key] ?? 0) != 0 }
-    func setBool(_ value: Bool, forKey key: String) { valores[key] = value ? 1 : 0 }
-}
-
 @Suite("Flags de sembrado")
 struct SeedFlagStoreTests {
 

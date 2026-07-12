@@ -753,7 +753,10 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
 Pocos y gordos: son los más lentos y frágiles, así que solo los caminos que, si se rompen, hacen la
 app inusable.
 
-- [ ] **E2E-01** Primer arranque: la app siembra el plan y muestra el día de hoy.
+- [x] **E2E-01** Primer arranque: la app siembra el plan y las tres tabs están. ⚠️ **No se afirma
+      sobre "hoy"**: el plan es un bloque de fechas fijas (mayo–julio de 2026) y, según cuándo corra
+      el test, hoy puede caer **fuera** de él —hoy, 11/7, ya es después—. Se afirma sobre la tab
+      **Plan**, donde el sembrado siempre se ve.
 - [ ] **E2E-02** Navegar el carrusel de días y saltar con la tira de la semana.
 - [ ] **E2E-03** **El recorrido principal:** sesión guiada — cargar peso y reps con la rueda,
       "Hecho", entra en descanso, saltear, avanza a la serie siguiente.
@@ -765,9 +768,13 @@ app inusable.
 - [ ] **E2E-09** Generar el reporte PDF → aparece la hoja de compartir.
 - [ ] **E2E-10** Exportar el plan a PDF → aparece la hoja de compartir.
 
-Los E2E necesitan que la app arranque con una base **determinística**. Agregar un launch argument
-(`-uitesting`) que fuerce container en memoria + plan sembrado fijo. Sin eso, los tests dependen de
-lo que haya quedado en el simulador y salen flaky.
+✅ **Base determinística lista.** `AppData.isUITesting` lee el launch argument `-uitesting`, y con
+él la app arranca con el contenedor **y los flags de sembrado en memoria** (`InMemorySeedFlagStore`,
+que se mudó de `GymLogTests/` a `Shared/` porque ahora lo usa también la app), el plan sembrado desde
+cero y **sin abrir el canal con el reloj** (no hay reloj emparejado; `transferUserInfo` encolaría
+entregas que nadie lee). Sin esto, el primer test siembra y deja el flag puesto en el simulador, y el
+segundo arranca con **otro estado**: flakes que no tienen nada que ver con lo que se está probando.
+El andamio está en `GymLogUITests/UITestSupport.swift` (`XCUIApplication.launchForUITesting()`).
 
 ---
 
