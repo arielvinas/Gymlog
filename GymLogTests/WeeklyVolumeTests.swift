@@ -115,4 +115,50 @@ struct WeeklyVolumeTests {
 
         #expect(WeeklyVolume.tonnage(for: miercoles, among: [press]) == 800)
     }
+
+    // MARK: - U-23
+
+    // El cero no es un caso de borde: es lo que ve **la mayoría de las semanas** de alguien
+    // que corre y va al gimnasio dos veces. La tarjeta de tendencia tiene que poder dibujar
+    // una barra en cero sin inventar nada ni romperse.
+
+    @Test("U-23 · Sin ejercicios, el tonelaje es cero")
+    func noExercisesMeansZeroTonnage() {
+        // Una app recién instalada, o una semana de descanso. `reduce(0, +)` sobre una lista
+        // vacía da 0, que es el valor correcto: no hay que distinguir "cero kilos" de "sin
+        // datos" — para una barra de volumen son lo mismo.
+        #expect(WeeklyVolume.tonnage(for: miercoles, among: []) == 0)
+    }
+
+    @Test("U-23 · Un ejercicio sin series suma cero")
+    func anExerciseWithoutSetsAddsZero() {
+        let db = TestDB()
+        let day = makeDay(miercoles, type: .fuerza, in: db.context)
+
+        // Los ejercicios de core del plan no tienen series (ver I-01: ocupan un paso pero no
+        // llevan `ExerciseSet`). El `flatMap(\.orderedSets)` los aplana a nada.
+        let plancha = makeExercise("Plancha", on: day, order: 0, targetReps: "30 s", in: db.context)
+        #expect(plancha.orderedSets.isEmpty)
+
+        #expect(WeeklyVolume.tonnage(for: miercoles, among: [plancha]) == 0)
+    }
+
+    @Test("U-23 · Una semana sin gimnasio da cero aunque haya ejercicios en otras")
+    func aWeekWithoutGymIsZero() {
+        let db = TestDB()
+
+        // Hay entrenamiento la semana anterior y la siguiente, pero no en esta. El filtro por
+        // semana deja la lista vacía y el `reduce` devuelve 0 — sin `nil`, sin división por
+        // cero, sin caso especial.
+        let anterior = makeDay(date(2026, 6, 10), type: .fuerza, in: db.context)
+        let siguiente = makeDay(date(2026, 6, 24), type: .fuerza, in: db.context)
+        let a = makeExercise("Press banca", on: anterior, order: 0, sets: [(80, 10)], in: db.context)
+        let b = makeExercise("Press banca", on: siguiente, order: 0, sets: [(90, 10)], in: db.context)
+
+        #expect(WeeklyVolume.tonnage(for: miercoles, among: [a, b]) == 0)
+
+        // Y las semanas de al lado sí suman: el cero de esta no se contagia.
+        #expect(WeeklyVolume.tonnage(for: date(2026, 6, 10), among: [a, b]) == 800)
+        #expect(WeeklyVolume.tonnage(for: date(2026, 6, 24), among: [a, b]) == 900)
+    }
 }

@@ -301,7 +301,11 @@ ninguna red.
       plancha, o una serie cargada a medias). Peso 0 **sí** entra y aporta 0 — no es `nil`. Filtra
       por semana **calendario** (`toGranularity: .weekOfYear`), no por "hace 7 días". ✅
       ⚠️ **Bug 15 (nuevo):** no filtra por `isDone`. Ver la tabla de bugs.
-- [ ] **U-23** `tonnage` con lista vacía → 0.
+- [x] **U-23** `tonnage` con lista vacía → 0. ✅ También: un ejercicio **sin series** (el core del
+      plan) suma 0, y una semana sin gimnasio da 0 **sin contagiar** a las de al lado.
+      No es un caso de borde: el cero es lo que ve la mayoría de las semanas. `reduce(0, +)` hace
+      lo correcto sin caso especial — para una barra de volumen, "cero kilos" y "sin datos" son lo
+      mismo.
 - [ ] **U-24** `actualKm` suma solo días completados. ⚠️ Asimétrico con `plannedKm`, que no filtra.
 - [ ] **U-25** `recentWeeks(6)`: devuelve 6, de la más vieja a la más nueva, la última contiene
       `today`.
