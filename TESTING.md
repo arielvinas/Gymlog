@@ -49,7 +49,14 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 Además, dos contradicciones entre el código y sus comentarios, que hay que resolver decidiendo
 cuál gana: `applyPlanUpdates` dice "los días que el usuario borre no se vuelven a insertar" pero
 compara por fecha (I-23), y `taperVariant` dice "sin el trabajo de pierna" pero solo saca
-"Flexión de rodillas", dejando aductores y extensión de rodillas (U-19).
+"Flexión de rodillas" (U-19).
+
+> ❓ **Decisión pendiente (U-19), no es un fix obvio.** El taper saca `Flexión de rodillas` y deja
+> **extensión de rodillas, aductores, peso muerto a una pierna y equilibrio en bosu**. Las dos
+> lecturas son coherentes y llevan a arreglos opuestos:
+> **(a)** si la intención era *descargar las piernas antes de la carrera*, el taper **no la
+> cumple** y hay que sacar los otros cuatro; **(b)** si era *solo bajar el volumen*, el código
+> está bien y **el comentario miente**. El test documenta lo que hace hoy. Falta que decidas.
 
 > ⚠️ **Nota sobre el fix del bug 12 (hallada en I-16).** El reloj **sí quiere** reabrir días
 > completos: `WatchWorkoutView` rotula el botón **"Repetir sesión"** cuando `day.isCompleted`.
@@ -250,9 +257,20 @@ ninguna red.
       `"Fuerza liviana (banco)"`, que tiene las dos. Reordenar los `if` cambiaría la rutina.
       El arreglo natural: un campo explícito en el día (un `enum` de rutina), no adivinar del texto.
       **Pendiente de arreglar.**
-- [ ] **U-19** ⚠️ Un día "liviana" → `taperVariant`: mitad de series redondeando hacia arriba
-      (`2→1`, `3→2`, `4→2`, `0→0`). **El comentario dice "sin trabajo de pierna" pero solo saca
-      "Flexión de rodillas"** — deja aductores y extensión de rodillas.
+- [x] **U-19** ⚠️ Un día "liviana" → `taperVariant`. ✅ Las series se parten al medio **redondeando
+      hacia arriba** (3 → 2, no 1: hacia abajo dejaría de ser un entrenamiento) y `max(1, …)`
+      garantiza al menos una serie. Tres hallazgos:
+      **(a) La contradicción es real** (ver abajo): dice "sin pierna" y solo saca `Flexión de
+      rodillas`. Quedan aductores, extensión de rodillas, peso muerto a una pierna y equilibrio.
+      **Necesita una decisión tuya**, no un fix obvio.
+      **(b) ⚠️ La nota del taper pisa la original**, que era la que explicaba el **circuito**
+      ("3 vueltas, sin pausa"). El usuario deja de ver esa instrucción. La rama que preservaba la
+      nota (`sets == 0`) es **código muerto**: ninguna plantilla tiene 0 series.
+      **(c) 🧨 Mina:** `taperVariant` reconstruye los templates **sin pasar `weighted`** (default
+      `true`), así que en la copia hasta el core figura "con peso". Hoy es inofensivo porque
+      `insert()` no lee ese flag y `tracksWeight` resuelve **por nombre** contra las listas
+      originales. El día que alguien haga que `insert()` use `template.weighted` —lo natural—, el
+      día de taper va a pedir kilos para el puente lateral y el equilibrio en bosu.
 - [ ] **U-20** Semana de pico (15-21/6) y taper (29/6-5/7): se filtran los ejercicios de salto.
       Bordes exactos: 14/6 no, 15/6 sí, 21/6 sí, 22/6 no, 28/6 no, 29/6 sí, 5/7 sí, 6/7 no.
 - [ ] **U-21** `tracksWeight`: los de peso corporal / banda / core / salto → `false`. Los
