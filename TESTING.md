@@ -38,7 +38,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series puntúa **0** y `cleanupKneeRecovery` **lo borra**. | I-30 |
 | 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`. | I-34 |
 | 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
-| 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. | I-21 |
+| 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. ✅ **CONFIRMADO y alcanzable** (I-21): el test corre cinco arranques seguidos y el estado no se mueve. No se sale solo. **Fix:** marcar la versión también cuando sale por el guard de `count == 0` — si ya hay días, el plan de esa versión *está* ahí. | I-21 ✅ |
 | 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. ✅ **CONFIRMADO por lectura, NO alcanzable** (las dos mitades). **No se puede testear el crash** —mataría toda la suite en paralelo— así que los tests fijan el borde seguro (`0` → `[]`) y la **contención**: los tres call sites (`ProgressDashboardView` ×2, `ProgressReportBuilder`) usan el **default** y ninguna UI produce un negativo. Fix cuando se haga configurable: `max(0, ...)`. | U-27 ✅, U-35 ✅ |
 | **12** | 🆕 **Reabrir un día terminado reinicia la sesión.** ✅ **CONFIRMADO y alcanzable** (I-15). `firstIncompleteIndex` hace `firstIndex { … } ?? 0`: sin series pendientes devuelve **0**, indistinguible de "la primera está pendiente". El botón "Empezar sesión guiada" **no está gateado por `isCompleted`**, así que abrir un día ya entrenado te deja en la serie 1 con el botón de completar listo — y seguir el flujo arranca un descanso de 90 s y rehace la sesión. La fase `.done` solo la pone `finish()`, o sea que **vive en memoria y no sobrevive a cerrar la sesión**. Datos no se pierden. **Pendiente de arreglar** — ⚠️ **ojo con el fix**: ver la nota de abajo. | I-15 ✅ |
 | **13** | 🆕 **Un "Anterior" que llega tarde resucita una sesión terminada.** ✅ **CONFIRMADO** (I-19). `apply(.goBack)` es el **único** comando sin guarda de fase: su `else if index > 0` se cumple igual en `.done`. La carrera es real: el espejo del iPhone dibuja "Anterior" en la fase de carga, y entre el toque y la llegada del comando al reloj hay un viaje de WatchConnectivity. Efecto: la sesión vuelve a `.logging`, el índice retrocede y **des-marca la anteúltima serie** (no la última), dejando el día **marcado como completo pero con un hueco**. Nadie lo devuelve a `.done`. **A diferencia de los bugs 3, 5 y 6, la UI no lo tapa** — la guarda que falta es precisamente contra la ventana en que la UI está vieja. **Pendiente de arreglar.** | I-19 ✅ |
@@ -645,12 +645,24 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
 
 ### Seeds y migraciones *(requieren P0-3, P0-4, P0-5)*
 
-- [ ] **I-21** ⚠️ **Bug 10.** Estado absorbente: flag en 0 + días existentes → `seedIfNeeded` sale
-      sin marcar versión → el plan no se actualiza nunca más.
-- [ ] **I-22** `seedIfNeeded` siembra en DB vacía, marca la versión, y es idempotente.
-- [ ] **I-23** ⚠️ **Contradicción.** `applyPlanUpdates` inserta solo fechas faltantes y no toca los
-      existentes — pero el comentario dice "los días que el usuario borre no se vuelven a insertar"
-      y **compara por fecha**: si sube `planVersion`, el día borrado **reaparece**.
+- [x] **I-21** ⚠️ **Bug 10 CONFIRMADO y alcanzable.** Estado absorbente: `seedIfNeeded` sale por el
+      segundo guard (`count == 0`) **sin marcar la versión**, y `applyPlanUpdates` exige
+      `stored >= 1`. Con el flag en 0 **y** días ya en la base, las dos se cruzan de brazos y el
+      flag **nunca sube de 0**: el plan no se actualiza nunca más, y no se sale solo (el test lo
+      verifica con cinco arranques seguidos). Se llega instalando en un dispositivo nuevo: CloudKit
+      baja los días **antes** que el flag —son dos stores distintos, sin orden garantizado— y el
+      primer `seed()` encuentra justo esa combinación.
+- [x] **I-22** `seedIfNeeded` siembra en DB vacía, marca la versión y es idempotente. Con la versión
+      ya sembrada **no toca la base aunque esté vacía** — correcto: si sembrara, duplicaría todo
+      cuando CloudKit termine de bajar los días.
+- [x] **I-23** ⚠️ **Contradicción CONFIRMADA** entre el código y su comentario. `applyPlanUpdates`
+      dice *"los días que el usuario borre no se vuelven a insertar"*, pero **compara por fecha**
+      contra el plan canónico e inserta lo que falta: un día borrado **es** una fecha que falta, así
+      que al subir `planVersion` **reaparece**. El comentario solo vale **dentro de una versión**
+      (donde el `guard stored < planVersion` la hace no correr). Los días existentes sí se respetan:
+      no los pisa ni los duplica.
+      **No se arregla acá:** para respetar el borrado hace falta recordar qué fechas borró el
+      usuario (*tombstones*). Es una decisión de producto, no un fix obvio.
 - [ ] **I-24** `deduplicateDays` conserva el día con más datos del usuario, y es idempotente.
 - [ ] **I-25** ⚠️ Con dos días de igual "riqueza", el ganador debe ser estable. Hoy desempata por
       `String(describing: persistentModelID)`, que en un container en memoria **no tiene orden
