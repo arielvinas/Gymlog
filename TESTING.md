@@ -391,8 +391,15 @@ ninguna red.
 
 ### Fuerza e historial
 
-- [ ] **U-34** `StrengthProgress.recentImprovements` detecta una subida de peso; ignora ejercicios
-      con menos de 2 sesiones con datos.
+- [x] **U-34** `StrengthProgress.recentImprovements` detecta una subida de peso; ignora ejercicios
+      con menos de 2 sesiones **con datos**. ✅ El % se calcula contra el peso **anterior** (80 → 85
+      = +6,25%). La "mejor serie" es la de **mayor peso** (no la última: una pirámide que termina
+      con una descarga no la confunde), y con peso empatado gana la de **más reps**.
+      Compara las **dos últimas** sesiones, no la primera con la última. Salen ordenadas por fecha,
+      la más reciente primero — importa porque `prefix(limit)` corta **después** de ordenar: se
+      muestran los ejercicios **más recientes**, no los que más subieron.
+      ⚠️ El % **solo mira el peso**: mismo peso con 4 reps más → **0%**. El contrato es "variación
+      del peso", pero el tipo se llama `ExerciseImprovement` y promete más de lo que mide.
 - [ ] **U-35** ⚠️ **Bug 11.** `limit: 0` → `[]`, pero `limit: -1` → **crash**. Y ⚠️ `percentChange`
       **puede ser negativo** — el tipo se llama "improvement" pero incluye retrocesos: fijar el
       contrato.
