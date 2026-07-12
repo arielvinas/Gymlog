@@ -165,6 +165,26 @@ fechas ya pasaron: `omitsJumps(on:)` (saca los ejercicios de salto en las semana
 titulados "liviana"). Si el plan pasa a ser recurrente, hay que decidir si se borran o se
 re-anclan a algo que no sea una fecha fija.
 
+## Primer paso al clonar: instalar los hooks
+
+```bash
+./scripts/setup-hooks.sh
+```
+
+Los hooks viven en `.githooks/` (versionados) en vez de `.git/hooks/` (que no se commitea y se
+pierde al clonar), así que **hay que instalarlos a mano una vez por clon**. Sin esto no hay red:
+
+| Hook | Qué corre | Tarda |
+|---|---|---|
+| `pre-commit` | Escaneo de datos personales y secretos | < 2 s |
+| `pre-push` | Los 336 tests unitarios | ~40 s |
+
+El escaneo **no es teórico**: este archivo llegó a tener el email y los UDIDs de los dispositivos,
+y hubo que reescribir el historial para sacarlos. El repo es público — una vez que algo se pushea,
+queda en los forks y en la caché de GitHub aunque se borre.
+
+Los tests y el detalle de todo esto están en **[TESTING.md](TESTING.md)**.
+
 ## Build / deploy (CLI)
 
 Requiere el **platform de watchOS** instalado (`xcodebuild -downloadPlatform watchOS`).

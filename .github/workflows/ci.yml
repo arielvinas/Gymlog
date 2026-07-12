@@ -37,8 +37,19 @@ jobs:
           - nombre: watchOS
             destino: "generic/platform=watchOS Simulator"
             esquema: "MaratonWatch Watch App"
+          # ⚠️ `generic/`, no `platform=macOS,...` a secas. Sin el `generic/`, xcodebuild resuelve el
+          # destino a "My Mac" —la Mac del runner— y falla con:
+          #
+          #   error: Xcode doesn't support My Mac's macOS 26.4
+          #
+          # El runner corre macOS 26.4 y Xcode 26.6 exige 26.5 para usar la Mac como destino. Es la
+          # única combinación que se rompe: los builds de simulador no dependen de la Mac real, por
+          # eso iOS y watchOS pasan y solo Catalyst falla.
+          #
+          # `generic/` = "Any Mac": compila para la arquitectura sin necesitar una Mac que pueda
+          # correrlo. Es lo que queremos — el job **compila**, no ejecuta.
           - nombre: Mac Catalyst
-            destino: "platform=macOS,variant=Mac Catalyst"
+            destino: "generic/platform=macOS,variant=Mac Catalyst"
             esquema: Maraton
 
     steps:
