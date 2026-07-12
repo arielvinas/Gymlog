@@ -446,8 +446,16 @@ ninguna red.
       Pero es **una sola gracia, no un colchón de dos días**: sin hoy ni ayer → 0. Un hueco corta
       (la racha es "hasta hoy", no "la más larga que tuviste"); los duplicados no la inflan; un
       registro futuro no la adelanta; cruza el fin de mes (suma con el calendario).
-- [ ] **U-40** `WorkoutDay.dailyStatus`: un día de descanso marcado como completado igual devuelve
-      `.rest`. Y `objective` con `detail` vacío.
+- [x] **U-40** `WorkoutDay.dailyStatus`: pendiente → completado en los cinco tipos de entrenamiento.
+      ⚠️ Un día de **descanso marcado como completado igual devuelve `.rest`**: el `if type ==
+      .descanso` corta antes de mirar `isCompleted`. No es un bug (descansar no se "completa"),
+      pero **el flag queda guardado en la base sin que nada lo muestre**: si alguien filtra por
+      `isCompleted` para contar días activos, se lleva los descansos marcados de regalo.
+      `objective` junta título y detalle (`"Fondo 12 km · Z2"`), y con el detalle vacío **no deja
+      el separador colgando**. ⚠️ Descanso y fuerza tienen objetivo **fijo** y no leen el título:
+      una nota como "Caminata suave" en un descanso queda **invisible** en la tarjeta de hoy.
+      `DailyPlanInfo.workout` busca por día de calendario (da igual la hora); con **duplicados
+      devuelve el primero del array** —arbitrario, no "el más completo"—.
 - [ ] **U-41** `WeekAssigner.weekInfo`: hereda el título si hay un día de esa semana; si no, crea
       `"Semana del …"` con `order = max + 1`. Con `days` vacío → `order = 1`.
 - [ ] **U-42** `ProgressReportBuilder.build` con `days` vacío → `periodStart = today`,
