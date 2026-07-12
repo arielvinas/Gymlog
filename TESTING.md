@@ -716,9 +716,18 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       ejercicios se borran y se rehacen, y **las tildes se van con ellos**. Con **un solo peso
       anotado** el mismo día se salva. No es "elegir mal entre dos copias" (bug 7): acá directamente
       se borra lo que hiciste.
-- [ ] **I-32** **Invariante global:** después de `AppData.seed` completo (seed → updates → strength
-      → dedup → cleanup), **no hay ninguna fecha duplicada**. Es la unicidad que CloudKit no puede
-      garantizar y que hoy sostiene el código a mano.
+- [x] **I-32** **Invariante global: después de `AppData.seed` completo no hay ninguna fecha
+      duplicada.** ✅ Se sostiene en los cuatro escenarios: sembrado limpio, dos arranques seguidos,
+      **merge de CloudKit** (el plan insertado dos veces, que es lo que pasó de verdad) y el estado
+      del bug 10. Al deduplicar tras el merge, **gana la copia con los datos del usuario**.
+      ⚠️ El invariante se cumple **incluso con el bug 10 activo**: `seedIfNeeded` y
+      `applyPlanUpdates` se cruzan de brazos, pero `deduplicateDays` corre igual porque **no mira
+      ningún flag**. O sea: el bug 10 congela el **plan**, no rompe la **unicidad**. Son dos
+      problemas separados — no confundirlos al arreglar el primero.
+      *Nota de orden:* `populateIfNeeded` corre **antes** que `deduplicateDays`, así que la rutina
+      se carga en **las dos copias** de un día duplicado y recién después se borra la perdedora (con
+      sus ejercicios en cascada). Trabajo desperdiciado, no un bug: el resultado final es correcto,
+      pero explica por qué un primer arranque con duplicados escribe más de lo esperable.
 
 ### Conectividad *(requiere P0-7)*
 
