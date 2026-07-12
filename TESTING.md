@@ -434,10 +434,18 @@ ninguna red.
 
 ### Suplementos, tipos y reporte
 
-- [ ] **U-38** `SupplementTracker.adherence`: fracción en la ventana; `days <= 0` → 0 (protegido);
-      logs duplicados el mismo día cuentan una vez; logs futuros no cuentan.
-- [ ] **U-39** `SupplementTracker.currentStreak`: solo hoy → 1; solo ayer (hoy no) → 1 (**el día en
-      curso no corta la racha**); un hueco corta.
+- [x] **U-38** `SupplementTracker.adherence`: fracción de días tomados en la ventana, que **incluye
+      hoy** y va hacia atrás (`lastDays: 7` = offsets 0..6; el séptimo día atrás queda afuera).
+      `days <= 0` → 0 (el `guard` evita dividir por cero; el call site con `planDays` ya lo protege
+      aparte con `max(1, ...)`). Los **duplicados del mismo día cuentan una vez** (`isTaken`
+      pregunta "¿hay alguno?", no "¿cuántos?") — importa, porque iCloud ya nos regaló duplicados
+      antes. Los registros **futuros no cuentan**. Cada suplemento se cuenta por separado.
+- [x] **U-39** `SupplementTracker.currentStreak`: solo hoy → 1; solo ayer (hoy no) → 1. **El día en
+      curso no corta la racha**: si hoy todavía no la tomaste, arranca en ayer. Sin esa gracia la
+      racha se vería en 0 toda la mañana y volvería a 3 al mediodía — es lo que la hace usable.
+      Pero es **una sola gracia, no un colchón de dos días**: sin hoy ni ayer → 0. Un hueco corta
+      (la racha es "hasta hoy", no "la más larga que tuviste"); los duplicados no la inflan; un
+      registro futuro no la adelanta; cruza el fin de mes (suma con el calendario).
 - [ ] **U-40** `WorkoutDay.dailyStatus`: un día de descanso marcado como completado igual devuelve
       `.rest`. Y `objective` con `detail` vacío.
 - [ ] **U-41** `WeekAssigner.weekInfo`: hereda el título si hay un día de esa semana; si no, crea
