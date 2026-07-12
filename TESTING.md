@@ -35,7 +35,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 4 | **Ráfaga de alertas al volver de background.** ✅ **CONFIRMADO** en I-07: vuelve con 35 s de tiempo extra → **4 vibraciones en <1 s**. Alcanzable a diario (el reloj apaga la pantalla y deja de tickear). **Pendiente de arreglar.** | I-07 ✅ |
 | 5 | ~~**`skipRest()` no valida la fase**~~ → **confirmado pero NO alcanzable** (I-11). En `.logging` saltea una serie; en la última, **deja la sesión en un callejón sin salida**; en `.done`, lo deshace. Lo tapan las UIs (el botón vive en la vista de descanso) y la guarda de `apply(_:)`. | I-11 ✅ |
 | 6 | ~~**`bringExerciseNext` no valida que el ejercicio pertenezca al día**~~ → **confirmado pero NO alcanzable** (I-14). Peor de lo anotado: no "reordena para nada" — le **reescribe el `order` al ejercicio ajeno**, dejando **dos ejercicios con el mismo `order` en el otro día**. Como `sorted` no es estable, ese día queda con orden indefinido. Lo contiene `switchableExercises`, que solo ofrece ejercicios del día. | I-14 ✅ |
-| 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series puntúa **0** y `cleanupKneeRecovery` **lo borra**. | I-30 |
+| 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series **se borra** al deduplicar. ✅ **CONFIRMADO y alcanzable** (I-28): un día con esfuerzo percibido + calorías del reloj vale **0**, y **una nota de una sola letra le gana**. Peor aún: hace que dos días **no** equivalentes empaten, y ahí el desempate por ID (I-25) sortea sobre datos reales. **Fix:** sumarlos a `richness()` — es aditivo, no rompe ningún desempate que hoy ande. | I-28 ✅ |
 | 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`. | I-34 |
 | 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
 | 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. ✅ **CONFIRMADO y alcanzable** (I-21): el test corre cinco arranques seguidos y el estado no se mueve. No se sale solo. **Fix:** marcar la versión también cuando sale por el guard de `count == 0` — si ya hay días, el plan de esa versión *está* ahí. | I-21 ✅ |
@@ -663,15 +663,30 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       no los pisa ni los duplica.
       **No se arregla acá:** para respetar el borrado hace falta recordar qué fechas borró el
       usuario (*tombstones*). Es una decisión de producto, no un fix obvio.
-- [ ] **I-24** `deduplicateDays` conserva el día con más datos del usuario, y es idempotente.
-- [ ] **I-25** ⚠️ Con dos días de igual "riqueza", el ganador debe ser estable. Hoy desempata por
-      `String(describing: persistentModelID)`, que en un container en memoria **no tiene orden
-      garantizado** — si el test sale flaky, ese **es** el hallazgo.
-- [ ] **I-26** El borrado arrastra en cascada `Exercise` y `ExerciseSet`: no quedan huérfanos.
+- [x] **I-24** `deduplicateDays` conserva el día con más datos del usuario, es idempotente, colapsa
+      tres copias en una y **solo agrupa por fecha** (un día vacío no se borra por ser "más pobre"
+      que otro de otra fecha).
+- [x] **I-25** El desempate entre copias de **igual riqueza** es
+      `String(describing: persistentModelID)`. **No es el problema**: si las dos empatan porque las
+      dos están vacías, son intercambiables y da igual cuál sobreviva (el test no afirma cuál).
+      ⚠️ El problema es el **bug 7**: cuando `richness()` no mira un campo que el usuario llenó,
+      dos días que **no** son equivalentes terminan empatados, y ahí el sorteo por ID decide sobre
+      **datos reales**. El desempate arbitrario es inofensivo *solo mientras* la riqueza sea
+      completa. Hoy no lo es.
+- [x] **I-26** El borrado arrastra en cascada `Exercise` y `ExerciseSet`: no quedan huérfanos
+      (verificado con `fetchCount` antes y después).
 - [ ] **I-27** `cleanupKneeRecoveryIfNeeded` borra los días vacíos del rango 24/6→5/7 y **preserva**
       los que tienen datos, incluida la carrera del 5/7.
-- [ ] **I-28** ⚠️ **Bug 7.** `richness()` no cuenta `perceivedEffort`, `activeCalories` ni
-      `isDone` → un día donde el usuario solo tildó las series **se borra**.
+- [x] **I-28** ⚠️ **Bug 7 CONFIRMADO y alcanzable.** `richness()` puntúa `isCompleted` (1000),
+      `actualKm` (200), `durationMinutes` (50), `avgHeartRate` (20), `notes` (10) y las series con
+      reps o peso. **No mira `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`.**
+      Consecuencia medida: un día con el esfuerzo percibido cargado y las calorías del reloj vale
+      **0**, y **una nota de un solo carácter le gana**. Lo mismo con una sesión de gimnasio hecha
+      **tildando las series sin anotar los kilos**: vale 0 y se borra entera.
+      Los tests **no dependen del orden de los IDs**: le dan una nota (`+10`) a la copia vacía, así
+      que si esos campos puntuaran algo, la copia con datos ganaría igual. Pierde.
+      **Fix:** sumarlos a `richness()` (`perceivedEffort`, `activeCalories`, y contar las series con
+      `isDone`). Es aditivo y no cambia ningún desempate que hoy funcione.
 - [ ] **I-29** `populateIfNeeded` llena los días de fuerza vacíos del 9/6 en adelante y **no toca**
       los anteriores.
 - [ ] **I-30** ⚠️ **Bug 8.** No debe pisar `exercise.notes` del usuario.
