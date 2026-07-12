@@ -36,8 +36,8 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | 5 | ~~**`skipRest()` no valida la fase**~~ → **confirmado pero NO alcanzable** (I-11). En `.logging` saltea una serie; en la última, **deja la sesión en un callejón sin salida**; en `.done`, lo deshace. Lo tapan las UIs (el botón vive en la vista de descanso) y la guarda de `apply(_:)`. | I-11 ✅ |
 | 6 | ~~**`bringExerciseNext` no valida que el ejercicio pertenezca al día**~~ → **confirmado pero NO alcanzable** (I-14). Peor de lo anotado: no "reordena para nada" — le **reescribe el `order` al ejercicio ajeno**, dejando **dos ejercicios con el mismo `order` en el otro día**. Como `sorted` no es estable, ese día queda con orden indefinido. Lo contiene `switchableExercises`, que solo ofrece ejercicios del día. | I-14 ✅ |
 | 7 | **`richness()` no cuenta `perceivedEffort`, `activeCalories` ni `ExerciseSet.isDone`** → un día donde el usuario solo tildó las series **se borra** al deduplicar. ✅ **CONFIRMADO y alcanzable** (I-28): un día con esfuerzo percibido + calorías del reloj vale **0**, y **una nota de una sola letra le gana**. Peor aún: hace que dos días **no** equivalentes empaten, y ahí el desempate por ID (I-25) sortea sobre datos reales. **Fix:** sumarlos a `richness()` — es aditivo, no rompe ningún desempate que hoy ande. **Alcance más grave (I-27):** `cleanupKneeRecoveryIfNeeded` usa el mismo `richness == 0` para borrar días **sin necesidad de duplicado**. Un día de la rehabilitación con solo esfuerzo percibido o con las series tildadas se borra **directo**. ⚠️ **Esa limpieza ya corrió en el dispositivo real** (commit `11438f6`), y el tramo 24/6→5/7/2026 ya pasó: conviene revisar si se perdió algo. | I-28 ✅, I-27 ✅ |
-| 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`. | I-34 |
-| 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**. | I-35 |
+| 8 | **`StrengthSeed` pisa `exercise.notes` del usuario**: la asignación está dentro del `if exercise.targetReps == nil`.  ✅ **CONFIRMADO** (I-30): con la rutina vieja (sin `targetReps`), una nota tuya se **reemplaza** por la del template. `restSeconds` e `imageName` sí preguntan antes de escribir; `notes` no. **Fix:** su propio `if exercise.notes == nil`. | I-30 ✅ |
+| 9 | **`hasLoggedData` mira `reps`/`weight` pero no `isDone`** → a un día donde el usuario solo tildó series, `populateIfNeeded` **le borra los ejercicios**.  ✅ **CONFIRMADO y alcanzable** (I-31): al subir `StrengthSeed.version`, un día hecho **tildando las series sin anotar kilos** se considera vacío, se borra y se rehace. Con **un solo peso anotado** se salva. **Fix:** que `hasLoggedData` mire también `isDone`. | I-31 ✅ |
 | 10 | **Estado absorbente en el sembrado:** flag en 0 + días ya existentes (CloudKit bajó los registros antes que el KVS) → `seedIfNeeded` sale sin marcar versión → `applyPlanUpdates` también sale → **el plan no se actualiza nunca más**. ✅ **CONFIRMADO y alcanzable** (I-21): el test corre cinco arranques seguidos y el estado no se mueve. No se sale solo. **Fix:** marcar la versión también cuando sale por el guard de `count == 0` — si ya hay días, el plan de esa versión *está* ahí. | I-21 ✅ |
 | 11 | **Crashes por parámetro negativo:** `WeeklyVolume.recentWeeks(-1)` y `StrengthProgress.recentImprovements(limit: -1)` → `fatalError` / precondition failure. Sin guard. ✅ **CONFIRMADO por lectura, NO alcanzable** (las dos mitades). **No se puede testear el crash** —mataría toda la suite en paralelo— así que los tests fijan el borde seguro (`0` → `[]`) y la **contención**: los tres call sites (`ProgressDashboardView` ×2, `ProgressReportBuilder`) usan el **default** y ninguna UI produce un negativo. Fix cuando se haga configurable: `max(0, ...)`. | U-27 ✅, U-35 ✅ |
 | **12** | 🆕 **Reabrir un día terminado reinicia la sesión.** ✅ **CONFIRMADO y alcanzable** (I-15). `firstIncompleteIndex` hace `firstIndex { … } ?? 0`: sin series pendientes devuelve **0**, indistinguible de "la primera está pendiente". El botón "Empezar sesión guiada" **no está gateado por `isCompleted`**, así que abrir un día ya entrenado te deja en la serie 1 con el botón de completar listo — y seguir el flujo arranca un descanso de 90 s y rehace la sesión. La fase `.done` solo la pone `finish()`, o sea que **vive en memoria y no sobrevive a cerrar la sesión**. Datos no se pierden. **Pendiente de arreglar** — ⚠️ **ojo con el fix**: ver la nota de abajo. | I-15 ✅ |
@@ -697,11 +697,25 @@ el cronómetro se simula sin esperar tiempo real. Es el mayor retorno del repo.
       que si esos campos puntuaran algo, la copia con datos ganaría igual. Pierde.
       **Fix:** sumarlos a `richness()` (`perceivedEffort`, `activeCalories`, y contar las series con
       `isDone`). Es aditivo y no cambia ningún desempate que hoy funcione.
-- [ ] **I-29** `populateIfNeeded` llena los días de fuerza vacíos del 9/6 en adelante y **no toca**
-      los anteriores.
-- [ ] **I-30** ⚠️ **Bug 8.** No debe pisar `exercise.notes` del usuario.
-- [ ] **I-31** ⚠️ **Bug 9.** No debe borrar los ejercicios de un día donde el usuario solo tildó
-      series (`isDone` sin reps/peso).
+- [x] **I-29** `populateIfNeeded` llena los días de fuerza vacíos del 9/6 en adelante (con sus series
+      y su `targetReps`) y **no toca** los anteriores ni los que no son de fuerza. Marca la versión
+      y **corre una sola vez por versión**. Un día del nuevo plan **sin datos** se reemplaza entero
+      —correcto *mientras no haya nada del usuario adentro*, que es justo lo que falla en I-31—.
+- [x] **I-30** ⚠️ **Bug 8 CONFIRMADO.** La asignación de `notes` está **adentro** del
+      `if exercise.targetReps == nil`, así que se pisa la nota del usuario sin chequearla —al revés
+      que `restSeconds` e `imageName`, que sí preguntan antes de escribir—. Con la rutina vieja
+      (sin `targetReps`), una nota tuya como *"Ojo con la rodilla: bajar despacio"* **se reemplaza**
+      por la del template. El comentario de la función promete "respetando lo que el usuario editó".
+      Si el ejercicio ya tenía `targetReps`, la nota se salva — pero **por accidente**, porque el
+      `if` no llegó a entrar, no porque el código la proteja.
+      Los ejercicios agregados a mano sí están a salvo (`guard let template = byName[...]`).
+      **Fix:** mover la asignación a su propio `if exercise.notes == nil`.
+- [x] **I-31** ⚠️ **Bug 9 CONFIRMADO y alcanzable.** El camino "reemplazar por completo" se elige con
+      `hasLoggedData`, que mira `reps` y `weight` **pero no `isDone`**. Una sesión hecha **tildando
+      las series sin anotar los kilos** parece intacta: al subir `StrengthSeed.version`, los
+      ejercicios se borran y se rehacen, y **las tildes se van con ellos**. Con **un solo peso
+      anotado** el mismo día se salva. No es "elegir mal entre dos copias" (bug 7): acá directamente
+      se borra lo que hiciste.
 - [ ] **I-32** **Invariante global:** después de `AppData.seed` completo (seed → updates → strength
       → dedup → cleanup), **no hay ninguna fecha duplicada**. Es la unicidad que CloudKit no puede
       garantizar y que hoy sostiene el código a mano.
