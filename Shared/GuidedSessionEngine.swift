@@ -55,6 +55,14 @@ final class GuidedSessionEngine {
     /// Cada cuántos segundos de tiempo extra se repite el aviso.
     private let overtimeAlertInterval = 10
 
+    /// De dónde sale "ahora". En la app es el reloj del sistema; en los tests se inyecta uno
+    /// controlado, así no hay que calcular los tiempos a mano contra `restEndDate`.
+    ///
+    /// `tickRest(now:)` **ya** recibía la fecha desde afuera; lo que faltaba era el resto:
+    /// `startRest`, `adjustRest` y `makeSnapshot` leían `Date()` por su cuenta, y eso hacía que
+    /// un test no pudiera fijar el punto de partida.
+    var clock: () -> Date = Date.init
+
     /// `true` mientras el descanso ya se cumplió pero la próxima serie no se
     /// confirmó: la UI muestra el tiempo extra en rojo.
     var isRestOvertime: Bool {
@@ -298,7 +306,7 @@ final class GuidedSessionEngine {
         restRemaining = seconds
         restOvertime = 0
         nextOvertimeAlert = 0
-        restEndDate = Date().addingTimeInterval(TimeInterval(seconds))
+        restEndDate = clock().addingTimeInterval(TimeInterval(seconds))
         phase = .resting
         onRestStarted?(seconds)
     }
@@ -339,8 +347,8 @@ final class GuidedSessionEngine {
     /// recomendado del ejercicio, para que quede recordado.
     func adjustRest(by delta: Int) {
         guard phase == .resting, let end = restEndDate, let exercise = currentStep?.exercise else { return }
-        let newRemaining = max(1, Int(end.timeIntervalSinceNow.rounded(.up)) + delta)
-        restEndDate = Date().addingTimeInterval(TimeInterval(newRemaining))
+        let newRemaining = max(1, Int(end.timeIntervalSince(clock()).rounded(.up)) + delta)
+        restEndDate = clock().addingTimeInterval(TimeInterval(newRemaining))
         restRemaining = newRemaining
         restOvertime = 0
         nextOvertimeAlert = 0
@@ -423,7 +431,7 @@ final class GuidedSessionEngine {
         let bodyweight: Bool = exercise.map { !$0.tracksWeight } ?? false
         let timeBased: Bool = exercise?.isTimeBased ?? false
         let restEnd: Date? = (phase == .resting) ? restEndDate : nil
-        let dayDate: Date = day?.date ?? Date()
+        let dayDate: Date = day?.date ?? clock()
 
         let snapshot = LiveSessionSnapshot(
             sessionID: sessionID,
@@ -446,7 +454,7 @@ final class GuidedSessionEngine {
             progressFraction: progressFraction,
             loggedSetsCount: loggedSetsCount,
             totalVolume: totalVolume,
-            updatedAt: Date()
+            updatedAt: clock()
         )
         return snapshot
     }

@@ -135,11 +135,17 @@ quedan como **checklist manual** antes de cada release:
       razón equivocada y se rompería el día que el bundle sí lo tenga. Se fija la mitad
       verificable: **la capa de la nube nunca se come el valor local**.
 
-- [ ] **P0-6 · Reloj inyectable en el engine** *(mejora, no bloqueante)*. `startRest`, `adjustRest`
-      y `makeSnapshot` usan `Date()` interno; `tickRest(now:)` **ya** recibe la fecha. Los tests del
-      engine **se pueden escribir hoy** calculando `now` relativo a `engine.restEndDate!` — feo pero
-      determinista. Inyectar un `var clock: () -> Date = Date.init` los deja mucho más legibles.
-      Hacerlo cuando los tests del engine ya estén verdes, no antes.
+- [x] **P0-6 · Reloj inyectable en el engine.** ✅ Hecho. `GuidedSessionEngine.clock: () -> Date`
+      (por defecto `Date.init`). Antes `startRest`, `adjustRest` y `makeSnapshot` leían `Date()` por
+      su cuenta —`tickRest(now:)` **ya** recibía la fecha— y los tests del descanso tenían que
+      calcular todo **relativo a `restEndDate`**: se leían al revés ("faltan 60" en vez de "pasaron
+      30"). Con el reloj inyectado, el test dice lo que quiere decir.
+      Los 330 tests que ya existían **pasaron sin tocar una línea**: el refactor no cambió el
+      comportamiento. Los 6 nuevos fijan lo que antes no se podía afirmar: que el descanso arranca
+      **exactamente** en el instante del reloj, que `adjustRest` cuenta **desde ahora** (no desde el
+      arranque) y que el `updatedAt` del snapshot —el que usa la regla de descarte de I-33— sale del
+      reloj.
+
 
 - [x] **P0-7 · Regla de descarte extraída.** ✅ Hecho. `LiveSessionConnectivity.shouldAccept(_:over:)`
       es ahora una `static func` pura, separada del transporte, y `handle(_:)` dejó de ser `private`.
