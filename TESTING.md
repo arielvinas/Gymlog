@@ -44,6 +44,7 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 | **13** | 🆕 **Un "Anterior" que llega tarde resucita una sesión terminada.** ✅ **CONFIRMADO** (I-19). `apply(.goBack)` es el **único** comando sin guarda de fase: su `else if index > 0` se cumple igual en `.done`. La carrera es real: el espejo del iPhone dibuja "Anterior" en la fase de carga, y entre el toque y la llegada del comando al reloj hay un viaje de WatchConnectivity. Efecto: la sesión vuelve a `.logging`, el índice retrocede y **des-marca la anteúltima serie** (no la última), dejando el día **marcado como completo pero con un hueco**. Nadie lo devuelve a `.done`. **A diferencia de los bugs 3, 5 y 6, la UI no lo tapa** — la guarda que falta es precisamente contra la ventana en que la UI está vieja. **Pendiente de arreglar.** | I-19 ✅ |
 | **14** | 🆕 **El espejo del iPhone cuenta una serie que no hiciste.** ✅ **CONFIRMADO y alcanzable** (I-11 → I-20). `loggedSetsCount` cuenta series **con datos** (`reps != nil \|\| weight != nil`), y el prellenado (I-17) ya le pone reps y peso a la serie actual. Al abrir la sesión, sin confirmar nada, `LiveSessionMirrorView` ya muestra **"1 series"**. `totalVolume` arrastra el mismo error (70 kg × 8 reps de una serie sin hacer). **En el resumen final los dos números son correctos** —ahí no queda ninguna prellenada de más— así que es un defecto del **espejo en vivo**, no del registro. Cosmético. | I-20 ✅ |
 | **15** | 🆕 **El tonelaje semanal cuenta series que no hiciste.** ✅ **CONFIRMADO y alcanzable** (U-22). `WeeklyVolume.tonnage` **no filtra por `isDone`**: suma peso × reps de **todas** las series de la semana. Con el prellenado (I-17) poniendo peso y reps en la serie actual, **abrir la sesión guiada y no entrenar ya le suma volumen a la semana**. Hermano del bug 14, pero peor: el 14 es cosmético y en vivo; este **queda** en la tarjeta de tendencia. Asimétrico con los km, que sí filtran por `isCompleted` (U-24). **Pendiente de arreglar.** | U-22 ✅ |
+| **16** | 🆕 **El histórico de peso se pierde detrás de 10 sesiones vacías.** ✅ **CONFIRMADO y alcanzable** (U-37). `ExerciseHistory.lastWeight`/`lastSession` traen `fetchLimit = 10`. Como el plan **siembra los días por adelantado**, cada faltazo deja un `Exercise` sin datos; con 10 vacíos seguidos del mismo ejercicio (≈5 semanas a dos días de fuerza) la app se olvida de con cuánto peso venías, aunque el registro siga en la base. **Fix:** filtrar en el predicado (`hasLoggedData` no es consultable, pero sí se puede pedir más de 10 y cortar en memoria) o subir el límite. | U-37 ✅ |
 
 Además, dos contradicciones entre el código y sus comentarios, que hay que resolver decidiendo
 cuál gana: `applyPlanUpdates` dice "los días que el usuario borre no se vuelven a insertar" pero
@@ -414,11 +415,22 @@ ninguna red.
       `anterior.top.weight > 0` evita dividir por cero → "+inf%"), pero un 0 en la sesión **nueva**
       pasa y reporta **−100%**. Defendible (pasar de +10 kg a peso corporal *es* −100% de carga
       externa), pero el mismo dato se ignora atrás y se reporta adelante.
-- [ ] **U-36** `ExerciseHistory.lastWeight` = el **mayor** peso de la última sesión anterior con
-      datos. Ignora el día actual (comparación con `<` estricto).
-- [ ] **U-37** ⚠️ **Asimetría:** `lastWeight` sigue buscando hacia atrás si la última sesión no
-      tiene ningún peso, pero `lastSession` solo mira la primera con datos. Y ambas tienen
-      `fetchLimit = 10`: con más de 10 registros previos sin datos, se pierde el histórico.
+- [x] **U-36** `ExerciseHistory.lastWeight` = el **mayor** peso de la última sesión anterior con
+      datos (no el último ni el promedio: las series de trabajo son las pesadas). Mira la sesión
+      **más reciente**, no el pico histórico. Ignora el día actual (`<` estricto: la sugerencia no
+      se retroalimenta con lo que acabás de escribir). Nombre vacío o sin histórico → `nil`; el
+      nombre se busca *trimmeado*. `lastSession` arma el resumen (`"70kg × 8, 70kg × 6"`), saltea
+      las series intactas y muestra las mitades con guión (`"— × 8"`): no inventa un número.
+- [x] **U-37** ⚠️ **Asimetría CONFIRMADA** entre las dos funciones: `lastSession` frena en la
+      primera sesión con **cualquier** dato (`hasLoggedData` acepta reps *o* peso), pero
+      `lastWeight` sigue hacia atrás hasta encontrar una con **peso**. Si la última sesión tiene
+      reps sin peso, la etiqueta dice `"— × 10"` y el campo se prellena con los 70 kg de dos
+      semanas antes. No es un bug —cada una responde bien su pregunta— pero al usuario le llega
+      como una contradicción, sin nada que explique de dónde salió el 70.
+      ⚠️ **Bug 16 (nuevo), CONFIRMADO y alcanzable:** ambas traen `fetchLimit = 10`. Como el plan
+      **siembra los días por adelantado**, cada faltazo deja un `Exercise` vacío; con 10 vacíos
+      seguidos del mismo ejercicio (≈5 semanas a dos días de fuerza) el histórico **se pierde**
+      aunque siga en la base. Con 9 vacíos todavía aparece.
 
 ### Suplementos, tipos y reporte
 
