@@ -46,6 +46,8 @@ actual**; si confirma el bug, se arregla en un commit separado del test.
 
 | **14** | 🆕 **El espejo del iPhone cuenta una serie que no hiciste.** ✅ **CONFIRMADO y alcanzable** (I-11 → I-20). `loggedSetsCount` cuenta series **con datos** (`reps != nil \|\| weight != nil`), y el prellenado (I-17) ya le pone reps y peso a la serie actual. Al abrir la sesión, sin confirmar nada, `LiveSessionMirrorView` ya muestra **"1 series"**. `totalVolume` arrastra el mismo error (70 kg × 8 reps de una serie sin hacer). **En el resumen final los dos números son correctos** —ahí no queda ninguna prellenada de más— así que es un defecto del **espejo en vivo**, no del registro. Cosmético. | I-20 ✅ |
 
+| **15** | 🆕 **El tonelaje semanal cuenta series que no hiciste.** ✅ **CONFIRMADO y alcanzable** (U-22). `WeeklyVolume.tonnage` **no filtra por `isDone`**: suma peso × reps de **todas** las series de la semana. Con el prellenado (I-17) poniendo peso y reps en la serie actual, **abrir la sesión guiada y no entrenar ya le suma volumen a la semana**. Hermano del bug 14, pero peor: el 14 es cosmético y en vivo; este **queda** en la tarjeta de tendencia. Asimétrico con los km, que sí filtran por `isCompleted` (U-24). **Pendiente de arreglar.** | U-22 ✅ |
+
 Además, dos contradicciones entre el código y sus comentarios, que hay que resolver decidiendo
 cuál gana: `applyPlanUpdates` dice "los días que el usuario borre no se vuelven a insertar" pero
 compara por fecha (I-23), y `taperVariant` dice "sin el trabajo de pierna" pero solo saca
@@ -295,7 +297,10 @@ ninguna red.
 
 ### Volumen (`Maraton/Models/WeeklyVolume.swift`)
 
-- [ ] **U-22** `tonnage` = Σ (peso × reps). Las series sin peso o sin reps **no suman**.
+- [x] **U-22** `tonnage` = Σ (peso × reps). Las series sin peso o sin reps **no suman** (core,
+      plancha, o una serie cargada a medias). Peso 0 **sí** entra y aporta 0 — no es `nil`. Filtra
+      por semana **calendario** (`toGranularity: .weekOfYear`), no por "hace 7 días". ✅
+      ⚠️ **Bug 15 (nuevo):** no filtra por `isDone`. Ver la tabla de bugs.
 - [ ] **U-23** `tonnage` con lista vacía → 0.
 - [ ] **U-24** `actualKm` suma solo días completados. ⚠️ Asimétrico con `plannedKm`, que no filtra.
 - [ ] **U-25** `recentWeeks(6)`: devuelve 6, de la más vieja a la más nueva, la última contiene
